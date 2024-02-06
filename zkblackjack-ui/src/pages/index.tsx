@@ -19,6 +19,11 @@ import Rules from "../components/Rules"
 import { Modal } from "../components/Modal"
 import { useSockets } from "../context/SocketContext"
 
+import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Program, Idl } from '@coral-xyz/anchor';
+import idl from '../../../target/idl/blackjack.json'; // Your IDL file path
+import { useAnchorProvider } from "../context/Solana"
+
 interface IProps {
   library: ethers.providers.Web3Provider
   account: string
@@ -42,6 +47,9 @@ const Home: NextPage<IProps> = ({
   const [room, setRoom] = useState("")
   const router = useRouter()
 
+  const [program, setProgram] = useState<Program | null>(null);
+  const anchorProvider = useAnchorProvider();
+
   const {
     socket,
     dealRoundCards,
@@ -62,6 +70,13 @@ const Home: NextPage<IProps> = ({
     setIsSinglePlayer(false)
     setIsGameEnded(false)
   }, [])
+
+
+  useEffect(() => {
+    const programID = new PublicKey('CrjAW6DMqPVe4LLXXxuonirYHAZF81DXBgiw2VuvG6Mr');
+    const solProgram = new Program(idl as Idl, programID, anchorProvider);
+    setProgram(solProgram);
+  }, []);
 
   const constructDeck = () => {
     const deck: string[] = []
@@ -224,40 +239,68 @@ const Home: NextPage<IProps> = ({
   }
 
   const startSinglePlayer = async () => {
-    try {
-      const signer = library?.getSigner()
-
-      const blackjackContract = new Contract(
-        BLACKJACK_CONTRACT_ADDRESS,
-        BLACKJACK_CONTRACT_ABI,
-        signer
-      )
-
-      const gameRoom = await blackjackContract.gameId()
-
-      const createGame: TransactionResponse = await toast.promise(
-        blackjackContract.startSinglePlayerGame({
-          value: ethers.utils.parseEther("0.01"),
-        }),
-
-        {
-          pending: "Sending transaction...",
-          success: "Starting the game",
-          error: "Something went wrong 🤯",
-        }
-      )
-      setIsLoading(true)
-
-      const confirmation = await library.waitForTransaction(createGame.hash)
-      setIsSinglePlayer(true)
-      setIsGameActive(true)
-
-      router.push(`/room/${gameRoom}`)
-    } catch (err) {
-      console.error(err)
-      setIsLoading(false)
+    if (!anchorProvider.wallet.publicKey || !program) {
+      // Make sure the wallet is connected
+      console.log("Wallet is not connected");
+      return;
     }
-  }
+  
+    try {
+  
+      // Assuming your function to start a single player game is called `startSinglePlayerGame`
+      // and it does not require any specific arguments besides the accounts
+      const tx = await program?.methods.startSinglePlayerGame({
+        accounts: {
+          game: 1, /* the public key for the game account, which you might need to create or have logic for */
+          player: anchorProvider.wallet.publicKey,
+          // Include other accounts your program method needs
+          systemProgram: PublicKey.default, // System Program
+        },
+        signers: [/* any signers besides the wallet, if needed */],
+      });
+  
+      console.log("Game started with transaction:", tx);
+      // Additional logic after successfully starting the game
+    } catch (error) {
+      console.error("Failed to start single player game:", error);
+    }
+  };
+
+  // const startSinglePlayer = async () => {
+  //   try {
+  //     const signer = library?.getSigner()
+
+  //     const blackjackContract = new Contract(
+  //       BLACKJACK_CONTRACT_ADDRESS,
+  //       BLACKJACK_CONTRACT_ABI,
+  //       signer
+  //     )
+
+  //     const gameRoom = await blackjackContract.gameId()
+
+  //     const createGame: TransactionResponse = await toast.promise(
+  //       blackjackContract.startSinglePlayerGame({
+  //         value: ethers.utils.parseEther("0.01"),
+  //       }),
+
+  //       {
+  //         pending: "Sending transaction...",
+  //         success: "Starting the game",
+  //         error: "Something went wrong 🤯",
+  //       }
+  //     )
+  //     setIsLoading(true)
+
+  //     const confirmation = await library.waitForTransaction(createGame.hash)
+  //     setIsSinglePlayer(true)
+  //     setIsGameActive(true)
+
+  //     router.push(`/room/${gameRoom}`)
+  //   } catch (err) {
+  //     console.error(err)
+  //     setIsLoading(false)
+  //   }
+  // }
 
   return (
     <div className="">

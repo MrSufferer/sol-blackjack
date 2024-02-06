@@ -6,6 +6,7 @@ import { Navbar } from "../components/Navbar"
 import io, { Socket } from "socket.io-client"
 // import { socket, SocketProvider } from "../../context/socket"
 import SocketsProvider from "../context/SocketContext"
+import { SolanaProvider } from "../context/Solana"
 
 const MyApp: AppType = ({ Component, pageProps }) => {
   const [library, setLibrary] = useState<ethers.providers.Web3Provider>()
@@ -16,26 +17,31 @@ const MyApp: AppType = ({ Component, pageProps }) => {
   return (
     <>
       <SocketsProvider>
-        <Navbar
-          library={library!}
-          setLibrary={setLibrary}
-          account={account}
-          setAccount={setAccount}
-          provider={provider}
-          setProvider={setProvider}
-        />
-        <Component
-          {...pageProps}
-          library={library!}
-          account={account}
-          isLoading={isLoading}
-          setIsLoading={setIsLoading}
-          // isSinglePlayer={isSinglePlayer}
-          // setIsSinglePlayer={setIsSinglePlayer}
-          // isGameActive={isGameActive}
-          // setIsGameActive={setIsGameActive}
-          // socket={socket}
-        />
+
+        <SolanaProvider>
+          <div>
+            <Navbar
+              library={library!}
+              setLibrary={setLibrary}
+              account={account}
+              setAccount={setAccount}
+              provider={provider}
+              setProvider={setProvider}
+            />
+            <Component
+              {...pageProps}
+              library={library!}
+              account={account}
+              isLoading={isLoading}
+              setIsLoading={setIsLoading}
+              // isSinglePlayer={isSinglePlayer}
+              // setIsSinglePlayer={setIsSinglePlayer}
+              // isGameActive={isGameActive}
+              // setIsGameActive={setIsGameActive}
+              // socket={socket}
+            />
+          </div>
+        </SolanaProvider>
       </SocketsProvider>
     </>
   )

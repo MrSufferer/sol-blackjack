@@ -3,6 +3,7 @@ import { Wallet } from "./Wallet"
 import { ethers } from "ethers"
 import Link from "next/link"
 import { useRouter } from "next/router"
+import { WalletButton } from "../context/Solana"
 
 interface IProps {
   account: string
@@ -51,14 +52,7 @@ export const Navbar: React.FC<IProps> = ({
         ) : (
           ""
         )} */}
-        <Wallet
-          account={account}
-          setAccount={setAccount}
-          setProvider={setProvider}
-          provider={provider}
-          setLibrary={setLibrary}
-          library={library!}
-        />
+        <WalletButton />
       </div>
     </div>
   )

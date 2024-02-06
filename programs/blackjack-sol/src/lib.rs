@@ -1,315 +1,254 @@
 use anchor_lang::prelude::*;
 
+declare_id!("8SRFsA98f7HikQZusHLEHEqvK26dQXb4XDWSzX2wL8vE");
+
 #[program]
-mod blackjack {
+pub mod blackjack {
     use super::*;
 
-    #[state]
-    pub struct Player {
-        pub bet: u64,
-        pub game_id: u16,
-        pub player_address: Pubkey,
+    /*
+    // Assuming you have a verifier program deployed on Solana
+    const VERIFIER_PROGRAM_ID: &str = "VerifierProgramPubkeyHere";
+
+    pub fn verify_round_win(ctx: Context<VerifyRoundWin>, proof: Proof) -> Result<()> {
+        // Construct the message to send to the verifier program
+        // This part depends on how your verifier program expects to receive data
+        let verifier_program_id = Pubkey::from_str(VERIFIER_PROGRAM_ID).unwrap();
+        let ix = Instruction {
+            program_id: verifier_program_id,
+            accounts: vec![/* Accounts needed by the verifier */],
+            data: proof.to_bytes(), // Convert your proof data to a byte vector
+        };
+
+        // Simulate a cross-program invocation to the verifier
+        // Note: Actual implementation may vary based on your verifier's API
+        solana_program::program::invoke(
+            &ix,
+            &[
+                ctx.accounts.player.to_account_info(),
+                // Add other accounts as required by the verifier
+            ],
+        )?;
+
+        Ok(())
+    }
+    */
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        let global_state = &mut ctx.accounts.global_state;
+        global_state.next_game_id = 1; // Starting game ID
+        Ok(())
     }
 
-    #[state]
-    pub struct Game {
-        pub total_bet: u64,
-        pub is_game_active: bool,
-        pub player1_address: Pubkey,
-        pub player2_address: Pubkey,
-        pub is_single_player: bool,
+    pub fn start_single_player_game(ctx: Context<StartGame>, bet_amount: u64) -> Result<()> {
+        let global_state = &mut ctx.accounts.global_state;
+        let game = &mut ctx.accounts.game;
+
+        game.game_id = global_state.next_game_id;
+        global_state.next_game_id += 1;
+
+        game.player_one = *ctx.accounts.player.key;
+        game.bet_amount = bet_amount;
+        game.is_game_active = true;
+        game.is_single_player = true;
+
+        emit!(GameCreated {
+            player1_address: *ctx.accounts.player.key,
+            bet: bet_amount,
+        });
+
+        Ok(())
     }
 
-    #[event]
-    pub struct GameCreated {
-        pub player1_address: Pubkey,
-        pub bet: u64,
+    pub fn start_multiplayer_game(ctx: Context<StartGame>, bet_amount: u64) -> Result<()> {
+        let global_state = &mut ctx.accounts.global_state;
+        let game = &mut ctx.accounts.game;
+
+        game.game_id = global_state.next_game_id;
+        global_state.next_game_id += 1;
+
+        game.player_one = *ctx.accounts.player.key;
+        game.bet_amount = bet_amount;
+        game.is_game_active = true;
+        game.is_single_player = false;
+
+        emit!(GameCreated {
+            player1_address: *ctx.accounts.player.key,
+            bet: bet_amount,
+        });
+
+        Ok(())
     }
 
-    #[event]
-    pub struct PlayerJoined {
-        pub player2_address: Pubkey,
-        pub game_id: u16,
+
+    pub fn create_game(ctx: Context<CreateGame>, bet_amount: u64) -> Result<()> {
+        let global_state = &mut ctx.accounts.global_state;
+        let game = &mut ctx.accounts.game;
+    
+        game.game_id = global_state.next_game_id;
+        global_state.next_game_id += 1; // Prepare the next game ID
+    
+        game.player_one = *ctx.accounts.player_one.key;
+        game.bet_amount = bet_amount;
+        game.is_game_active = true;
+    
+        emit!(GameCreated {
+            player1_address: *ctx.accounts.player_one.key,
+            bet: bet_amount,
+        });
+    
+        Ok(())
     }
 
-    #[event]
-    pub struct GameEnded {
-        pub winner_address: Pubkey,
-        pub total_prize: u64,
+    pub fn join_game(ctx: Context<JoinGame>) -> Result<()> {
+        let game = &mut ctx.accounts.game;
+        if game.bet_amount != ctx.accounts.player.bet {
+            return Err(ErrorCode::BetAmountMismatch.into());
+        }
+        game.player_two = Some(ctx.accounts.player.to_account_info().key());
+    
+        emit!(PlayerJoined {
+            player2_address: ctx.accounts.player.to_account_info().key(),
+            game_id: game.game_id,
+        });
+        Ok(())
+    }
+    
+
+    pub fn end_game(ctx: Context<EndGame>) -> Result<()> {
+        let game = &mut ctx.accounts.game;
+        // Placeholder for determining the winner logic
+        let winner_address = game.player_one; // Simplified for example purposes
+        emit!(GameEnded {
+            winner_address,
+            total_prize: game.bet_amount * 2,
+        });
+        game.is_game_active = false;
+        Ok(())
     }
 
-    #[account]
-    pub struct Verifier {
-        // Define verifier account fields
+    pub fn withdraw_bet(ctx: Context<WithdrawBet>, amount: u64) -> Result<()> {
+        require!(ctx.accounts.game.is_game_active == false, ErrorCode::GameActive);
+        require!(ctx.accounts.player.bet >= amount, ErrorCode::InsufficientBalance);
+    
+        // Example for transferring SOL. For SPL tokens, you would use the Token program
+        **ctx.accounts.player.to_account_info().try_borrow_mut_lamports()? -= amount;
+        **ctx.accounts.player.to_account_info().try_borrow_mut_lamports()? += amount;
+    
+        // Reset player's bet or adjust accordingly
+        ctx.accounts.player.bet -= amount;
+    
+        emit!(GameEnded {
+            winner_address: ctx.accounts.player.key(),
+            total_prize: amount,
+        });
+    
+        Ok(())
     }
-
-    #[instruction]
-    pub struct VerifyProof {
-        pub a: [u64; 2],
-        pub b: [[u64; 2]; 2],
-        pub c: [u64; 2],
-        pub input: [u64; 3],
-    }
-
-    #[program]
-    pub mod blackjack {
-        use super::*;
-
-        #[state]
-        pub struct Blackjack {
-            pub verifier_address: Pubkey,
-            pub casino_address: Pubkey,
-            pub bet_amount: u64,
-            pub game_id: u16,
-            pub players: AccountVec<Player>,
-            pub games: AccountVec<Game>,
-        }
-
-        impl Blackjack {
-            #[init]
-            pub fn new(ctx: Context<Initialize>, verifier_address: Pubkey) -> ProgramResult {
-                let blackjack = &mut ctx.accounts.blackjack;
-                blackjack.verifier_address = verifier_address;
-                blackjack.casino_address = *ctx.accounts.authority.key;
-                blackjack.bet_amount = 1_000_000; // Set your default bet amount
-                Ok(())
-            }
-
-            #[instruction]
-            pub fn verify_proof(ctx: Context<VerifyProof>) -> ProgramResult {
-                // Implement proof verification logic
-                // Call IVerifier contract on Ethereum using Solana-Ethereum cross-chain bridge
-                Ok(())
-            }
-
-            #[instruction]
-            pub fn start_single_player_game(ctx: Context<StartSinglePlayerGame>) -> ProgramResult {
-                let blackjack = &mut ctx.accounts.blackjack;
-                let player = &mut ctx.accounts.player;
-
-                // Check if the player has enough balance to start the game
-                if player.bet < blackjack.bet_amount {
-                    return Err(ErrorCode::InsufficientBalance.into());
-                }
-
-                // Update game state
-                let game = Game {
-                    total_bet: blackjack.bet_amount,
-                    is_game_active: true,
-                    player1_address: *ctx.accounts.authority.key,
-                    player2_address: Pubkey::default(), // Placeholder for single-player game
-                    is_single_player: true,
-                };
-
-                // Update player state
-                player.bet -= blackjack.bet_amount;
-                player.game_id = blackjack.game_id;
-
-                // Emit GameCreated event
-                blackjack.game_id += 1;
-                emit!(GameCreated {
-                    player1_address: *ctx.accounts.authority.key,
-                    bet: blackjack.bet_amount,
-                });
-
-                Ok(())
-            }
-
-            #[instruction]
-            pub fn start_multiplayer_game(ctx: Context<StartMultiplayerGame>) -> ProgramResult {
-                let blackjack = &mut ctx.accounts.blackjack;
-                let player = &mut ctx.accounts.player;
-
-                // Check if the player has enough balance to start the game
-                if player.bet < blackjack.bet_amount {
-                    return Err(ErrorCode::InsufficientBalance.into());
-                }
-
-                // Update game state
-                let game = Game {
-                    total_bet: blackjack.bet_amount,
-                    is_game_active: true,
-                    player1_address: *ctx.accounts.authority.key,
-                    player2_address: Pubkey::default(), // Placeholder for multiplayer game
-                    is_single_player: false,
-                };
-
-                // Update player state
-                player.bet -= blackjack.bet_amount;
-                player.game_id = blackjack.game_id;
-
-                // Emit GameCreated event
-                blackjack.game_id += 1;
-                emit!(GameCreated {
-                    player1_address: *ctx.accounts.authority.key,
-                    bet: blackjack.bet_amount,
-                });
-
-                Ok(())
-            }
-
-            #[instruction]
-            pub fn join_game(ctx: Context<JoinGame>) -> ProgramResult {
-                let blackjack = &mut ctx.accounts.blackjack;
-                let player = &mut ctx.accounts.player;
-
-                // Check if the game is active
-                if !blackjack.games[ctx.accounts.game_id as usize].is_game_active {
-                    return Err(ErrorCode::GameNotActive.into());
-                }
-
-                // Check if the game is not single-player
-                if blackjack.games[ctx.accounts.game_id as usize].is_single_player {
-                    return Err(ErrorCode::InvalidOperation.into());
-                }
-
-                // Check if the player has enough balance to join the game
-                if player.bet < blackjack.bet_amount {
-                    return Err(ErrorCode::InsufficientBalance.into());
-                }
-
-                // Update game state
-                blackjack.games[ctx.accounts.game_id as usize].player2_address =
-                    *ctx.accounts.authority.key;
-                blackjack.games[ctx.accounts.game_id as usize].total_bet += blackjack.bet_amount;
-
-                // Update player state
-                player.bet -= blackjack.bet_amount;
-                player.game_id = ctx.accounts.game_id;
-
-                // Emit PlayerJoined event
-                emit!(PlayerJoined {
-                    player2_address: *ctx.accounts.authority.key,
-                    game_id: ctx.accounts.game_id,
-                });
-
-                Ok(())
-            }
-
-            #[instruction]
-            pub fn withdraw_bet(ctx: Context<WithdrawBet>, amount: u64) -> ProgramResult {
-                let blackjack = &mut ctx.accounts.blackjack;
-                let player = &mut ctx.accounts.player;
-
-                // Check if the game is not active
-                if blackjack.games[player.game_id as usize].is_game_active {
-                    return Err(ErrorCode::GameActive.into());
-                }
-
-                // Check if the player has enough balance to withdraw
-                if player.bet < amount {
-                    return Err(ErrorCode::InsufficientBalance.into());
-                }
-
-                // Transfer funds to the player
-                ctx.accounts.authority.transfer(amount)?;
-
-                // Clean up player and game state
-                player.bet -= amount;
-                delete blackjack.players[player.game_id as usize];
-                delete blackjack.games[player.game_id as usize];
-
-                emit!(GameEnded {
-                    winner_address: *ctx.accounts.authority.key,
-                    total_prize: amount,
-                });
-
-                Ok(())
-            }
-
-            #[instruction]
-            pub fn end_game(ctx: Context<EndGame>) -> ProgramResult {
-                let blackjack = &mut ctx.accounts.blackjack;
-                let game = &mut ctx.accounts.game;
-
-                // Implement game end logic based on your requirements
-                // Determine the winner, distribute winnings, etc.
-                // ...
-
-                // Update game state
-                game.is_game_active = false;
-
-                // Emit GameEnded event
-                emit!(GameEnded {
-                    winner_address: Pubkey::default(), // Placeholder for winner address
-                    total_prize: game.total_bet,
-                });
-
-                Ok(())
-            }
-        }
-
-        #[derive(Accounts)]
-        pub struct Initialize<'info> {
-            #[account(init, payer = authority, space = 8 + 8 + 8 + 2 + 32, seeds = [&b"blackjack"[..], authority.key.as_ref()], constraint = authority)]
-            pub blackjack: Account<'info, Blackjack>,
-            pub authority: Signer<'info>,
-            pub system_program: Program<'info, System>,
-        }
-
-        #[derive(Accounts)]
-        pub struct StartSinglePlayerGame<'info> {
-            #[account(mut)]
-            pub blackjack: Account<'info, Blackjack>,
-            #[account(init, payer = authority, space = 8, constraint = authority)]
-            pub player: Account<'info, Player>,
-            pub authority: Signer<'info>,
-            pub system_program: Program<'info, System>,
-        }
-
-        #[derive(Accounts)]
-        pub struct StartMultiplayerGame<'info> {
-            #[account(mut)]
-            pub blackjack: Account<'info, Blackjack>,
-            #[account(init, payer = authority, space = 8, constraint = authority)]
-            pub player: Account<'info, Player>,
-            pub authority: Signer<'info>,
-            pub system_program: Program<'info, System>,
-        }
-
-        #[derive(Accounts)]
-        pub struct JoinGame<'info> {
-            #[account(mut)]
-            pub blackjack: Account<'info, Blackjack>,
-            #[account(init, payer = authority, space = 8, constraint = authority)]
-            pub player: Account<'info, Player>,
-            pub authority: Signer<'info>,
-            pub system_program: Program<'info, System>,
-            #[account(mut)]
-            pub game: Account<'info, Game>,
-        }
-
-        #[derive(Accounts)]
-        pub struct WithdrawBet<'info> {
-            #[account(mut)]
-            pub blackjack: Account<'info, Blackjack>,
-            #[account(mut)]
-            pub player: Account<'info, Player>,
-            pub authority: Signer<'info>,
-            pub system_program: Program<'info, System>,
-        }
-
-        #[derive(Accounts)]
-        pub struct EndGame<'info> {
-            #[account(mut)]
-            pub blackjack: Account<'info, Blackjack>,
-            #[account(mut)]
-            pub game: Account<'info, Game>,
-            pub authority: Signer<'info>,
-            pub system_program: Program<'info, System>,
-        }
-    }
+    
 }
 
-// Define an error enum for custom errors
-#[error]
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(init, payer = user, space = 8 + 2, seeds = [b"global_state".as_ref()], bump)]
+    pub global_state: Account<'info, GlobalState>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+pub struct GlobalState {
+    pub next_game_id: u16,
+}
+
+#[derive(Accounts)]
+pub struct CreateGame<'info> {
+    #[account(mut)]
+    pub global_state: Account<'info, GlobalState>, // Add this
+    #[account(init, payer = player_one, space = 8 + 8 + 8 + 1 + 32 + 32 + 8)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player_one: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct JoinGame<'info> {
+    #[account(mut)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player: Account<'info, Player>,
+    // Removed has_one = player_one as it's not correctly applicable here
+}
+
+#[derive(Accounts)]
+pub struct EndGame<'info> {
+    #[account(mut)]
+    pub game: Account<'info, Game>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawBet<'info> {
+    #[account(mut)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player: Account<'info, Player>,
+    // Include other necessary account references here
+}
+
+#[derive(Accounts)]
+pub struct StartGame<'info> {
+    #[account(mut)]
+    pub global_state: Account<'info, GlobalState>,
+    #[account(init, payer = player, space = 8 + 8 + 32 + 32 + 8 + 1 + 1 + 2)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+pub struct Game {
+    pub game_id: u16,
+    pub player_one: Pubkey,
+    pub player_two: Option<Pubkey>,
+    pub bet_amount: u64,
+    pub is_game_active: bool,
+    pub is_single_player: bool,
+}
+
+#[account]
+pub struct Player {
+    pub bet: u64,
+    // Include other player-related fields
+}
+
+#[event]
+pub struct GameCreated {
+    pub player1_address: Pubkey,
+    pub bet: u64,
+}
+
+#[event]
+pub struct PlayerJoined {
+    pub player2_address: Pubkey,
+    pub game_id: u16,
+}
+
+#[event]
+pub struct GameEnded {
+    pub winner_address: Pubkey,
+    pub total_prize: u64,
+}
+
+#[error_code]
 pub enum ErrorCode {
-    #[msg("Insufficient balance")]
-    InsufficientBalance,
-    #[msg("Game is not active")]
-    GameNotActive,
-    #[msg("Invalid operation")]
-    InvalidOperation,
-    #[msg("Game is active")]
+    #[msg("The bet amount does not match the game's bet amount.")]
+    BetAmountMismatch,
+    #[msg("Game is currently active.")]
     GameActive,
+    #[msg("Insufficient balance.")]
+    InsufficientBalance,
+    // Add other error codes as necessary
 }
+

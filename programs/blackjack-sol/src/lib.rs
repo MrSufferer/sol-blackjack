@@ -43,8 +43,10 @@ pub mod blackjack {
         let global_state = &mut ctx.accounts.global_state;
         let game = &mut ctx.accounts.game;
 
-        game.game_id = global_state.next_game_id;
+        // Increment the game ID for the next game
         global_state.next_game_id += 1;
+
+        game.game_id = global_state.next_game_id;
 
         game.player_one = *ctx.accounts.player.key;
         game.bet_amount = bet_amount;
@@ -200,7 +202,13 @@ pub struct WithdrawBet<'info> {
 pub struct StartGame<'info> {
     #[account(mut)]
     pub global_state: Account<'info, GlobalState>,
-    #[account(init, payer = player, space = 8 + 8 + 32 + 32 + 8 + 1 + 1 + 2)]
+    #[account(
+        init,
+        payer = player,
+        space = 8 + 8 + 32 + 32 + 8 + 1 + 1 + 8,
+        seeds = [b"game", global_state.next_game_id.to_le_bytes().as_ref()],
+        bump
+    )]
     pub game: Account<'info, Game>,
     #[account(mut)]
     pub player: Signer<'info>,

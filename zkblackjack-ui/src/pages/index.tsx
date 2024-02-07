@@ -19,7 +19,8 @@ import Rules from "../components/Rules"
 import { Modal } from "../components/Modal"
 import { useSockets } from "../context/SocketContext"
 
-import { Connection, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import web3, { SystemProgram, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import anchor, { BN } from "@coral-xyz/anchor";
 import { Program, Idl } from '@coral-xyz/anchor';
 import idl from '../../../target/idl/blackjack.json'; // Your IDL file path
 import { useAnchorProvider } from "../context/Solana"
@@ -239,28 +240,61 @@ const Home: NextPage<IProps> = ({
   }
 
   const startSinglePlayer = async () => {
-    if (!anchorProvider.wallet.publicKey || !program) {
+    console.log(anchorProvider.wallet)
+    console.log(PublicKey.default)
+    console.log(program)
+    if (!anchorProvider.wallet) {
       // Make sure the wallet is connected
       console.log("Wallet is not connected");
+      toast("Wallet is not connected");
       return;
     }
   
     try {
+
+      if (!program) throw new Error("Program is not initialized");
+
+      const [globalStatePda] = await PublicKey.findProgramAddress(
+        [Buffer.from('global_state')],
+        program.programId
+      );
+
+      const globalStateAccount = await program.account.globalState.fetch(globalStatePda);
+      const next_game_id = globalStateAccount.nextGameId; // Adjust based on your actual field name
+
+      const [gamePda, gameBump] = await PublicKey.findProgramAddress(
+        [
+          Buffer.from("game"),
+          // Ensure this is the correct byte representation of your next_game_id
+          // You might need to fetch the globalState account to get the next_game_id
+          Buffer.from(next_game_id.toString())
+        ],
+        program.programId
+      );
+      
+      
   
-      // Assuming your function to start a single player game is called `startSinglePlayerGame`
-      // and it does not require any specific arguments besides the accounts
-      const tx = await program?.methods.startSinglePlayerGame({
-        accounts: {
-          game: 1, /* the public key for the game account, which you might need to create or have logic for */
-          player: anchorProvider.wallet.publicKey,
-          // Include other accounts your program method needs
-          systemProgram: PublicKey.default, // System Program
-        },
-        signers: [/* any signers besides the wallet, if needed */],
-      });
+      const tx = await program?.methods.startSinglePlayerGame(
+        new BN(1e6) // Assuming this is the bet amount
+      ).accounts({
+        globalState: globalStatePda,
+        game: gamePda,
+        player: anchorProvider.wallet.publicKey,
+        systemProgram: SystemProgram.programId,
+      }).rpc({commitment: "confirmed"});
+
+      setIsLoading(true)
+
+      console.log("Game started with transaction signature:", tx);
+
+      // const globalStateAccount = await program?.account.globalState.fetch(globalStatePda);
+      // const gameRoom = globalStateAccount?.next_game_id.toString();
+
+
+      setIsSinglePlayer(true)
+      setIsGameActive(true)
   
-      console.log("Game started with transaction:", tx);
-      // Additional logic after successfully starting the game
+      router.push(`/room/${next_game_id}`)
     } catch (error) {
       console.error("Failed to start single player game:", error);
     }

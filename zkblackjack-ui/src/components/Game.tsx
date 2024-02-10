@@ -525,31 +525,37 @@ export const Game: React.FC<IProps> = ({
     }
 
     try {
-      const signer = library?.getSigner()
+      // const signer = library?.getSigner()
 
-      const blackjackContract = new Contract(
-        BLACKJACK_CONTRACT_ADDRESS,
-        BLACKJACK_CONTRACT_ABI,
-        signer
-      )
+      // const blackjackContract = new Contract(
+      //   BLACKJACK_CONTRACT_ADDRESS,
+      //   BLACKJACK_CONTRACT_ABI,
+      //   signer
+      // )
 
-      const result: TransactionResponse =
-        await blackjackContract.verifyRoundWin(
-          calldata.a,
-          calldata.b,
-          calldata.c,
-          calldata.Input
-        )
-      if (result) {
+      // const result: TransactionResponse =
+      //   await blackjackContract.verifyRoundWin(
+      //     calldata.a,
+      //     calldata.b,
+      //     calldata.c,
+      //     calldata.Input
+      //   )
+      // if (result) {
+      //   getWinner(
+      //     player,
+      //     calldata.Input[0],
+      //     calldata.Input[1],
+      //     calldata.Input[2]
+      //   )
+      // } else {
+      //   return false
+      // }
         getWinner(
           player,
           calldata.Input[0],
           calldata.Input[1],
           calldata.Input[2]
         )
-      } else {
-        return false
-      }
     } catch (error) {
       console.error(error)
     }

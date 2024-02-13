@@ -24,14 +24,14 @@ const Rules: React.FC = () => {
         {/* <hr className="h-0.5 mx-auto w-12 relative bottom-1 bg-gray-400" /> */}
         <ul className="px-6 py-2 text-white space-y-3 text-">
           <li className="font-poppins  text-base">
-            Entry fee is <span className="font-semibold ">0.01</span> Goerli
-            ETH.
+            Entry fee is <span className="font-semibold ">0.1</span> Solana
+            .
           </li>
           {/* <hr className="h-0.5  relative bottom-1 bg-gray-400" /> */}
 
           <li className="text-base font-poppins   ">
             If your game score is positive then you will win the game and get
-            extra 0.01 Goerli ETH.
+            extra 0.1 Solana.
           </li>
           <li className="text-base font-poppins   ">
             Only first cards of the opponents can be seen and at the end of the

@@ -204,14 +204,22 @@ pub struct StartGame<'info> {
     pub global_state: Account<'info, GlobalState>,
     #[account(
         init,
-        payer = player,
+        payer = signer,
         space = 8 + 8 + 32 + 32 + 8 + 1 + 1 + 8,
         seeds = [b"game", global_state.next_game_id.to_le_bytes().as_ref()],
         bump
     )]
     pub game: Account<'info, Game>,
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + 32 + 8, // Adjust space as needed for player account data
+        seeds = [b"player", signer.key().as_ref(), global_state.next_game_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub player_account: Account<'info, Player>,
     #[account(mut)]
-    pub player: Signer<'info>,
+    pub signer: Signer<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -228,6 +236,7 @@ pub struct Game {
 #[account]
 pub struct Player {
     pub bet: u64,
+    pub game_id: u16
     // Include other player-related fields
 }
 

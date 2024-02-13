@@ -1,10 +1,18 @@
 {
     "scripts": {
         "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-        "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+        "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+        "test:psp": "light psp:test blackjack Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+        "build:psp": "light psp:build blackjack"
     },
     "dependencies": {
-        "@coral-xyz/anchor": "^0.28.0"
+        "@coral-xyz/anchor": "^0.28.0",
+        "@lightprotocol/circuit-lib.circom": "0.1.0-alpha.1",
+        "@lightprotocol/zk.js": "0.3.2-alpha.16",
+        "@project-serum/anchor": "^0.26.0",
+        "circomlib": "^2.0.5",
+        "circomlibjs": "^0.1.7",
+        "snarkjs": "^0.7.3"
     },
     "devDependencies": {
         "chai": "^4.3.4",

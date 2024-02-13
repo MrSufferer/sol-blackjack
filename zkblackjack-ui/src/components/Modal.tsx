@@ -149,12 +149,12 @@ export const Modal: React.FC<IProps> = ({
 
                 <ul className="p-6 space-y-6">
                   <li className="text-base leading-relaxed text-gray-500 font-poppins dark:text-gray-400">
-                    Entry fee is 0.01 Goerli ETH.
+                    Entry fee is 0.1 Solana.
                   </li>
 
                   <li className="text-base leading-relaxed text-gray-500 dark:text-gray-400">
                     If your game score is positive then you will win the game
-                    and get extra 0.01 Goerli ETH.
+                    and get extra 0.1 Solana.
                   </li>
                   <li className="text-base leading-relaxed text-gray-500 dark:text-gray-400">
                     Game continues till one deck (52 cards) is finished. I guess

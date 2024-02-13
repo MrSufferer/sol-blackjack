@@ -1,0 +1,75 @@
+pragma circom 2.1.4;
+
+include "mux1.circom";
+include "comparators.circom";
+include "poseidon.circom";
+include "merkleProof.circom";
+include "keypair.circom";
+include "gates.circom";
+
+#[instance]
+{
+    name: blackjack,
+    publicInputs: [sumPlayer, sumHouse],
+}
+
+#[entrypoint]
+template blackjack() {
+    signal input sumPlayer;
+    signal input sumHouse;
+    signal output out;
+    signal output draw;
+    signal output playerScore;
+
+    // Initialize comparison components for bust conditions
+    component cmpPlayerBust = LessThan(22);
+    cmpPlayerBust.in[0] <== sumPlayer;
+    cmpPlayerBust.in[1] <== 22;
+
+    component cmpHouseBust = LessThan(22);
+    cmpHouseBust.in[0] <== sumHouse;
+    cmpHouseBust.in[1] <== 22;
+
+    // Check for draw condition
+    component cmpDraw = IsEqual();
+    cmpDraw.in[0] <== sumPlayer;
+    cmpDraw.in[1] <== sumHouse;
+
+    // Determine bust conditions
+    signal playerBust;
+    signal houseBust;
+    signal playerWins;
+
+    playerBust <== 1 - cmpPlayerBust.out; // 1 if player busts, 0 otherwise
+    houseBust <== 1 - cmpHouseBust.out; // 1 if house busts, 0 otherwise
+
+    // Determine draw condition
+    draw <== cmpDraw.out; // 1 if draw, 0 otherwise
+
+    // Logic for player win condition
+    component cmpPlayerHigher = GreaterThan(32); // Ensure the bit width is appropriate for your numbers
+    cmpPlayerHigher.in[0] <== sumPlayer;
+    cmpPlayerHigher.in[1] <== sumHouse;
+    playerWins <== (1 - playerBust) * (houseBust + cmpPlayerHigher.out);
+
+    signal gameOutcome;
+
+    // If it's a draw, set gameOutcome to 2. Otherwise, check if the player wins (set to 1) or loses (set to 0).
+    // Note: This approach assumes draw and playerWins are binary signals (0 or 1).
+
+    // First, calculate if the game is not a draw and the player wins.
+    signal notDrawAndPlayerWins;
+    notDrawAndPlayerWins <== (1 - draw) * playerWins;
+
+    // Then, calculate if the game is not a draw and the player does not win (i.e., loses).
+    signal notDrawAndPlayerLoses;
+    notDrawAndPlayerLoses <== (1 - draw) * (1 - playerWins);
+
+    // Now, use these signals to set gameOutcome.
+    // 0: lose, 1: win, 2: draw
+    gameOutcome <== 2 * draw + notDrawAndPlayerWins - notDrawAndPlayerLoses;
+
+    // Assign outputs
+    out <== gameOutcome;
+    playerScore <== sumPlayer;
+}

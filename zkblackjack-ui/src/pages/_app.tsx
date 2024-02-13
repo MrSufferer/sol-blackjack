@@ -6,11 +6,11 @@ import { Navbar } from "../components/Navbar"
 import io, { Socket } from "socket.io-client"
 // import { socket, SocketProvider } from "../../context/socket"
 import SocketsProvider from "../context/SocketContext"
-import { SolanaProvider } from "../context/Solana"
+import { SolanaProvider, useAnchorProvider } from "../context/Solana"
+import { AnchorProvider } from "@coral-xyz/anchor"
 
 const MyApp: AppType = ({ Component, pageProps }) => {
-  const [library, setLibrary] = useState<ethers.providers.Web3Provider>()
-  const [account, setAccount] = useState<string>("")
+  const anchorProvider = useAnchorProvider()
   const [provider, setProvider] = useState()
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
@@ -21,17 +21,15 @@ const MyApp: AppType = ({ Component, pageProps }) => {
         <SolanaProvider>
           <div>
             <Navbar
-              library={library!}
-              setLibrary={setLibrary}
-              account={account}
-              setAccount={setAccount}
+              library={anchorProvider!}
+              account={anchorProvider.publicKey}
               provider={provider}
               setProvider={setProvider}
             />
             <Component
               {...pageProps}
-              library={library!}
-              account={account}
+              library={anchorProvider!}
+              account={anchorProvider.publicKey}
               isLoading={isLoading}
               setIsLoading={setIsLoading}
               // isSinglePlayer={isSinglePlayer}

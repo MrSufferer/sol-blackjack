@@ -4,22 +4,20 @@ import { ethers } from "ethers"
 import Link from "next/link"
 import { useRouter } from "next/router"
 import { WalletButton } from "../context/Solana"
+import { AnchorProvider } from "@coral-xyz/anchor"
+import { PublicKey } from "@solana/web3.js"
 
 interface IProps {
-  account: string
-  setAccount: (val: string) => void
+  account: PublicKey
   setProvider: any
   provider: any
-  library: ethers.providers.Web3Provider
-  setLibrary: (val: ethers.providers.Web3Provider) => void
+  library: AnchorProvider
 }
 
 export const Navbar: React.FC<IProps> = ({
   account,
-  setAccount,
   setProvider,
   provider,
-  setLibrary,
   library,
 }) => {
   const router = useRouter()

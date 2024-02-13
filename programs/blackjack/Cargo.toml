@@ -1,0 +1,28 @@
+[package]
+name = "blackjack"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "blackjack"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.28.0"
+anchor-spl = "0.28.0"
+light-merkle-tree-program = { version="0.3.1", features = ["cpi"] }
+light-psp4in4out-app-storage = { version="0.3.1", features = ["cpi"] }
+light-macros = { version="0.3.1" }
+light-verifier-sdk = { version="0.3.1" }
+solana-program = "1.16.4"
+groth16-solana = "0.0.2"
+bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"]}
+memoffset = "0.9.0"

@@ -281,7 +281,7 @@ const Home: NextPage<IProps> = ({
         game: gamePda,
         player: anchorProvider.wallet.publicKey,
         systemProgram: SystemProgram.programId,
-      })
+      }).rpc({commitment: "confirmed"})
 
       setIsLoading(true)
 

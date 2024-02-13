@@ -21,11 +21,17 @@ import { useRouter } from "next/router"
 import { useSockets, Withdraw } from "../context/SocketContext"
 import { blackjackCalldata } from "../../zkproof/snarkjsBlackjack"
 import { Ace, Card, Sum, Stand, Score } from "../context/SocketContext"
-import Router from "next/router"
+
+import { AnchorProvider, BN } from "@coral-xyz/anchor"
+import { useAnchorProvider } from "../context/Solana"
+import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js"
+
+import { Program, Idl } from '@coral-xyz/anchor';
+import idl from '../../../target/idl/blackjack.json'; // Your IDL file path
 
 interface IProps {
-  library: ethers.providers.Web3Provider
-  account: string
+  library: AnchorProvider
+  account: PublicKey
   room?: string
   isLoading: boolean
   setIsLoading: (val: boolean) => void
@@ -97,6 +103,9 @@ export const Game: React.FC<IProps> = ({
   const router = useRouter()
   const effectRan = useRef(false)
 
+  const anchorProvider = useAnchorProvider()
+  const [program, setProgram] = useState<Program>();
+
   useEffect(() => {
     if (effectRan.current === false) {
       setIsLoading(false)
@@ -121,6 +130,12 @@ export const Game: React.FC<IProps> = ({
       effectRan.current = true
     }
   }, [])
+
+  useEffect(() => {
+    const programID = new PublicKey('CrjAW6DMqPVe4LLXXxuonirYHAZF81DXBgiw2VuvG6Mr');
+    const solProgram = new Program(idl as Idl, programID, anchorProvider);
+    setProgram(solProgram);
+  }, []);
 
   const deck: string[] = []
 
@@ -286,28 +301,26 @@ export const Game: React.FC<IProps> = ({
     }
   }, [stand])
 
-  const unlockBet = async (playerAddress: string, playerNumber: string) => {
+  
+
+  const unlockBet = async (playerAddress: PublicKey, playerNumber: string) => {
     try {
-      const signer = new ethers.Wallet(
-        process.env.NEXT_PUBLIC_PRIVATE_KEY!,
-        library
-      )
 
-      const signerAddress = signer.getAddress()
+      const playerPublicKey = anchorProvider.wallet.publicKey; // Or any specific public key
+      const SEEDS = [Buffer.from("player"), playerPublicKey.toBuffer(), ];
 
-      const blackjackContract = new Contract(
-        BLACKJACK_CONTRACT_ADDRESS,
-        BLACKJACK_CONTRACT_ABI,
-        signer
-      )
-      const player = await blackjackContract.players(playerAddress)
+      const [playerPDA, bump] = await PublicKey.findProgramAddress(SEEDS, PROGRAM_ID);
 
-      const gameId = await player.gameId
+
+          
+      const playerAccount = await program?.account.player?.fetch(playerPDA);
+      const gameId = playerAccount?.game_id
+
 
       if (playerNumber === "1") {
         if (score.playerOne > 0) {
           toast.info(
-            "You have won the game and extra 0.01 ETH! Wait for withdraw button to come",
+            "You have won the game and extra 0.01 Solana! Wait for withdraw button to come",
             {
               position: "top-center",
               autoClose: 5000,
@@ -320,22 +333,41 @@ export const Game: React.FC<IProps> = ({
           )
           setIsLoading(true)
 
-          const data = {
-            from: signerAddress,
-            to: BLACKJACK_CONTRACT_ADDRESS,
-            value: ethers.utils.parseEther("0.01"),
-          }
 
-          const tx: TransactionResponse = await signer.sendTransaction(data)
+        // Step 1: Transfer 0.01 SOL to the game account as winnings
+        let transaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: anchorProvider.publicKey,
+            toPubkey: account, // Assuming the game account collects the winnings
+            lamports: 0.01 * LAMPORTS_PER_SOL,
+          })
+        );
 
-          const confirmation = await library.waitForTransaction(tx.hash)
+        // Sign and send the transaction
+        let signature = await anchorProvider.sendAndConfirm(transaction, [anchorProvider.wallet]);
+        console.log("Transfer confirmed with signature:", signature);
 
-          const endGame: TransactionResponse = await blackjackContract.endGame(
-            account,
-            gameId,
-            ethers.utils.parseEther("0.02")
-          )
-          const endGameReceipt = await library.waitForTransaction(endGame.hash)
+
+        // Derive the PDA for the game account
+        const [gameAccountPda, gameAccountBump] = await PublicKey.findProgramAddress(
+          [Buffer.from('game'), Buffer.from(gameId.toString())],
+          PROGRAM_ID
+        );
+
+        // Derive the PDA for the player account
+        const [playerAccountPda, playerAccountBump] = await PublicKey.findProgramAddress(
+          [Buffer.from('player'), playerPublicKey.toBuffer()],
+          programId
+        );
+
+        // Step 2: Call the endGame function from your program
+        await program.methods.endGame(new PublicKey(gameId), {
+          accounts: {
+            gameAccount: gameAccountPda,
+            playerAccount: playerAccountPda,
+            // Add other required accounts here
+          },
+        });
 
           // setIsCanWithdraw(true)
           setIsCanWithdraw((prevState: Withdraw) => ({
@@ -357,16 +389,16 @@ export const Game: React.FC<IProps> = ({
           )
           setIsLoading(true)
 
-          const endGame: TransactionResponse = await blackjackContract.endGame(
-            account,
-            gameId,
-            ethers.utils.parseEther("0.01")
-          )
-          const endGameReceipt = await library.waitForTransaction(endGame.hash)
-          setIsCanWithdraw((prevState: Withdraw) => ({
-            ...prevState,
-            playerOne: true,
-          }))
+          // const endGame: TransactionResponse = await blackjackContract.endGame(
+          //   account,
+          //   gameId,
+          //   ethers.utils.parseEther("0.01")
+          // )
+          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
+          // setIsCanWithdraw((prevState: Withdraw) => ({
+          //   ...prevState,
+          //   playerOne: true,
+          // }))
           // setIsCanWithdraw(true)
         } else {
           toast.info(
@@ -383,12 +415,12 @@ export const Game: React.FC<IProps> = ({
           )
           setIsLoading(true)
 
-          const endGame: TransactionResponse = await blackjackContract.endGame(
-            account,
-            gameId,
-            ethers.utils.parseEther("0.00")
-          )
-          const endGameReceipt = await library.waitForTransaction(endGame.hash)
+          // const endGame: TransactionResponse = await blackjackContract.endGame(
+          //   account,
+          //   gameId,
+          //   ethers.utils.parseEther("0.00")
+          // )
+          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
           setIsCanWithdraw((prevState: Withdraw) => ({
             ...prevState,
             playerOne: false,
@@ -398,9 +430,9 @@ export const Game: React.FC<IProps> = ({
           router.push("/")
         }
       } else {
-        const nonce = await library.getTransactionCount(
-          "0xB402f112a2C8BF41739129F69c52bb97Eb95119a"
-        )
+        // const nonce = await library.getTransactionCount(
+        //   "0xB402f112a2C8BF41739129F69c52bb97Eb95119a"
+        // )
         if (score.playerTwo > 0) {
           toast.info(
             "You have won the game and extra 0.01 ETH! Wait for withdraw button to come",
@@ -416,25 +448,25 @@ export const Game: React.FC<IProps> = ({
           )
           setIsLoading(true)
 
-          const data = {
-            from: signerAddress,
-            to: BLACKJACK_CONTRACT_ADDRESS,
-            value: ethers.utils.parseEther("0.01"),
-          }
+          // const data = {
+          //   from: signerAddress,
+          //   to: BLACKJACK_CONTRACT_ADDRESS,
+          //   value: ethers.utils.parseEther("0.01"),
+          // }
 
-          const tx: TransactionResponse = await signer.sendTransaction(data)
+          // const tx: TransactionResponse = await signer.sendTransaction(data)
 
-          const confirmation = await library.waitForTransaction(tx.hash)
+          // const confirmation = await library.waitForTransaction(tx.hash)
 
-          const endGame: TransactionResponse = await blackjackContract.endGame(
-            account,
-            gameId,
-            ethers.utils.parseEther("0.02"),
-            {
-              nonce: nonce + 1,
-            }
-          )
-          const endGameReceipt = await library.waitForTransaction(endGame.hash)
+          // const endGame: TransactionResponse = await blackjackContract.endGame(
+          //   account,
+          //   gameId,
+          //   ethers.utils.parseEther("0.02"),
+          //   {
+          //     nonce: nonce + 1,
+          //   }
+          // )
+          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
 
           setIsCanWithdraw((prevState: Withdraw) => ({
             ...prevState,
@@ -454,15 +486,15 @@ export const Game: React.FC<IProps> = ({
             }
           )
           setIsLoading(true)
-          const endGame: TransactionResponse = await blackjackContract.endGame(
-            account,
-            gameId,
-            ethers.utils.parseEther("0.01"),
-            {
-              nonce: nonce + 1,
-            }
-          )
-          const endGameReceipt = await library.waitForTransaction(endGame.hash)
+          // const endGame: TransactionResponse = await blackjackContract.endGame(
+          //   account,
+          //   gameId,
+          //   ethers.utils.parseEther("0.01"),
+          //   {
+          //     nonce: nonce + 1,
+          //   }
+          // )
+          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
 
           setIsCanWithdraw((prevState: Withdraw) => ({
             ...prevState,
@@ -482,15 +514,15 @@ export const Game: React.FC<IProps> = ({
             }
           )
           setIsLoading(true)
-          const endGame: TransactionResponse = await blackjackContract.endGame(
-            account,
-            gameId,
-            ethers.utils.parseEther("0.00"),
-            {
-              nonce: nonce + 1,
-            }
-          )
-          const endGameReceipt = await library.waitForTransaction(endGame.hash)
+          // const endGame: TransactionResponse = await blackjackContract.endGame(
+          //   account,
+          //   gameId,
+          //   ethers.utils.parseEther("0.00"),
+          //   {
+          //     nonce: nonce + 1,
+          //   }
+          // )
+          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
           setIsCanWithdraw((prevState: Withdraw) => ({
             ...prevState,
             playerTwo: false,
@@ -506,6 +538,7 @@ export const Game: React.FC<IProps> = ({
       console.error(err)
     }
   }
+
 
   const calculateProof = async (player: string) => {
     let calldata: any

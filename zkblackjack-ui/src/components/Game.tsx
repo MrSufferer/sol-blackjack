@@ -29,6 +29,8 @@ import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana
 import { Program, Idl } from '@coral-xyz/anchor';
 import idl from '../../../target/idl/blackjack.json'; // Your IDL file path
 
+const PROGRAM_ID: string = "51P27qRbeM4UxhQzNeKiyok6FW5sxZvGkt2M9b9uFtK2";
+
 interface IProps {
   library: AnchorProvider
   account: PublicKey
@@ -68,8 +70,8 @@ export const Game: React.FC<IProps> = ({
   //   playerTwo: [],
   // })
 
-  const [playerTwo, setPlayerTwo] = useState("")
-  const [playerOne, setPlayerOne] = useState("")
+  const [playerTwo, setPlayerTwo] = useState<PublicKey>()
+  const [playerOne, setPlayerOne] = useState<PublicKey>()
 
   const {
     socket,
@@ -132,7 +134,7 @@ export const Game: React.FC<IProps> = ({
   }, [])
 
   useEffect(() => {
-    const programID = new PublicKey('CrjAW6DMqPVe4LLXXxuonirYHAZF81DXBgiw2VuvG6Mr');
+    const programID = new PublicKey(PROGRAM_ID);
     const solProgram = new Program(idl as Idl, programID, anchorProvider);
     setProgram(solProgram);
   }, []);
@@ -141,20 +143,41 @@ export const Game: React.FC<IProps> = ({
 
   const withdrawBet = async (player: string) => {
     try {
-      const signer = library?.getSigner()
+      if (!program) throw new Error("Program is not initialized");
 
-      const blackjackContract = new Contract(
-        BLACKJACK_CONTRACT_ADDRESS,
-        BLACKJACK_CONTRACT_ABI,
-        signer
-      )
+      const playerPublicKey = anchorProvider?.wallet.publicKey; // Or any specific public key
+      const SEEDS = [Buffer.from("player"), playerPublicKey.toBuffer(), ];
+  
+      const [playerPDA, bump] = await PublicKey.findProgramAddress(SEEDS, new PublicKey(PROGRAM_ID));
+  
+  
+          
+      const playerAccount = await program?.account.player?.fetch(playerPDA);
+      const gameId: number = playerAccount?.game_id
+  
+  
+      const [bettingVaultPDA] = await PublicKey.findProgramAddress(
+        [Buffer.from('betting_vault'), playerPublicKey.toBuffer()],
+        new PublicKey(PROGRAM_ID)
+      );
+  
+  
+      // Derive the PDA for the game account
+      const [gameAccountPda, gameAccountBump] = await PublicKey.findProgramAddress(
+        [Buffer.from('game'), new BN(gameId).toArrayLike(Buffer, 'le', 2)],
+        new PublicKey(PROGRAM_ID)
+      );
+
       if (player === "1") {
         if (score.playerOne > 0) {
-          const tx: TransactionResponse = await toast.promise(
-            blackjackContract.withdrawBet(
-              ethers.utils.parseEther("0.02"),
-              parseInt(room!)
-            ),
+          const tx = await toast.promise(
+            program.methods.withdrawBet(0.2 * LAMPORTS_PER_SOL)
+              .accounts({
+                  game: gameAccountPda,
+                  player: playerPDA,
+                  betting_vault: bettingVaultPDA
+                  // Add other required accounts here
+              }).rpc(),
 
             {
               pending: "Withdrawing...",
@@ -162,7 +185,7 @@ export const Game: React.FC<IProps> = ({
               error: "Something went wrong 🤯",
             }
           )
-          const confirmation = await library.waitForTransaction(tx.hash)
+          // const confirmation = await library.waitForTransaction(tx.hash)
           // setIsCanWithdraw((prevState: Withdraw) => ({
           //   ...prevState,
           //   playerOne: true,
@@ -306,16 +329,17 @@ export const Game: React.FC<IProps> = ({
   const unlockBet = async (playerAddress: PublicKey, playerNumber: string) => {
     try {
 
-      const playerPublicKey = anchorProvider.wallet.publicKey; // Or any specific public key
+      const playerPublicKey = anchorProvider?.wallet.publicKey; // Or any specific public key
       const SEEDS = [Buffer.from("player"), playerPublicKey.toBuffer(), ];
 
-      const [playerPDA, bump] = await PublicKey.findProgramAddress(SEEDS, PROGRAM_ID);
+      const [playerPDA, bump] = await PublicKey.findProgramAddress(SEEDS, new PublicKey(PROGRAM_ID));
 
 
           
       const playerAccount = await program?.account.player?.fetch(playerPDA);
-      const gameId = playerAccount?.game_id
+      const gameId: number = playerAccount?.game_id
 
+      if (!program) throw new Error("Program is not initialized");
 
       if (playerNumber === "1") {
         if (score.playerOne > 0) {
@@ -333,41 +357,39 @@ export const Game: React.FC<IProps> = ({
           )
           setIsLoading(true)
 
+          const [bettingVaultPDA] = await PublicKey.findProgramAddress(
+            [Buffer.from('betting_vault'), playerPublicKey.toBuffer()],
+            new PublicKey(PROGRAM_ID)
+          );
 
-        // Step 1: Transfer 0.01 SOL to the game account as winnings
+
+        // Step 1: Transfer 0.1 SOL to the game account as winnings
         let transaction = new Transaction().add(
           SystemProgram.transfer({
-            fromPubkey: anchorProvider.publicKey,
-            toPubkey: account, // Assuming the game account collects the winnings
-            lamports: 0.01 * LAMPORTS_PER_SOL,
+            fromPubkey: anchorProvider?.wallet.publicKey, // it should be the house keypair. For now, just use the user's fund
+            toPubkey: bettingVaultPDA, // 
+            lamports: 0.1 * LAMPORTS_PER_SOL,
           })
         );
 
         // Sign and send the transaction
-        let signature = await anchorProvider.sendAndConfirm(transaction, [anchorProvider.wallet]);
+        let signature = await anchorProvider.sendAndConfirm(transaction);
         console.log("Transfer confirmed with signature:", signature);
 
 
         // Derive the PDA for the game account
         const [gameAccountPda, gameAccountBump] = await PublicKey.findProgramAddress(
-          [Buffer.from('game'), Buffer.from(gameId.toString())],
-          PROGRAM_ID
-        );
-
-        // Derive the PDA for the player account
-        const [playerAccountPda, playerAccountBump] = await PublicKey.findProgramAddress(
-          [Buffer.from('player'), playerPublicKey.toBuffer()],
-          programId
+          [Buffer.from('game'), new BN(gameId).toArrayLike(Buffer, 'le', 2)],
+          new PublicKey(PROGRAM_ID)
         );
 
         // Step 2: Call the endGame function from your program
-        await program.methods.endGame(new PublicKey(gameId), {
-          accounts: {
-            gameAccount: gameAccountPda,
-            playerAccount: playerAccountPda,
+        await program.methods.endGame(gameId, 0.2 * LAMPORTS_PER_SOL)
+        .accounts({
+            game: gameAccountPda,
+            player: playerPDA,
             // Add other required accounts here
-          },
-        });
+        }).rpc();
 
           // setIsCanWithdraw(true)
           setIsCanWithdraw((prevState: Withdraw) => ({
@@ -402,7 +424,7 @@ export const Game: React.FC<IProps> = ({
           // setIsCanWithdraw(true)
         } else {
           toast.info(
-            "It was a close game but you have lost it. Play again to earn back your 0.01 ETH ",
+            "It was a close game but you have lost it. Play again to earn back your 0.1 SOL ",
             {
               position: "top-center",
               autoClose: 5000,
@@ -435,7 +457,7 @@ export const Game: React.FC<IProps> = ({
         // )
         if (score.playerTwo > 0) {
           toast.info(
-            "You have won the game and extra 0.01 ETH! Wait for withdraw button to come",
+            "You have won the game and extra 0.1 SOL! Wait for withdraw button to come",
             {
               position: "top-center",
               autoClose: 5000,
@@ -502,7 +524,7 @@ export const Game: React.FC<IProps> = ({
           }))
         } else {
           toast.info(
-            "It was a close game but you have lost it. Play again to earn back your 0.01 ETH ",
+            "It was a close game but you have lost it. Play again to earn back your 0.1 SOL ",
             {
               position: "top-center",
               autoClose: 5000,
@@ -1315,8 +1337,8 @@ export const Game: React.FC<IProps> = ({
       <Table
         isGameEnded={isGameEnded}
         getCard={getCard}
-        library={library}
-        account={account}
+        library={anchorProvider}
+        account={anchorProvider?.wallet.publicKey}
         // socket={socket}
         room={room}
         isLoading={isLoading}

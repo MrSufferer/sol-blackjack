@@ -74,7 +74,7 @@ const Home: NextPage<IProps> = ({
 
 
   useEffect(() => {
-    const programID = new PublicKey('CrjAW6DMqPVe4LLXXxuonirYHAZF81DXBgiw2VuvG6Mr');
+    const programID = new PublicKey('51P27qRbeM4UxhQzNeKiyok6FW5sxZvGkt2M9b9uFtK2');
     const solProgram = new Program(idl as Idl, programID, anchorProvider);
     setProgram(solProgram);
   }, []);
@@ -259,33 +259,70 @@ const Home: NextPage<IProps> = ({
         program.programId
       );
 
-      const globalStateAccount = await program.account.globalState.fetch(globalStatePda);
-      const next_game_id = globalStateAccount.nextGameId; // Adjust based on your actual field name
+      const globalStateAccount = await program?.account.globalState?.fetch(globalStatePda);
+
+
+      console.log(globalStateAccount?.nextGameId)
+
 
       const [gamePda, gameBump] = await PublicKey.findProgramAddress(
         [
           Buffer.from("game"),
           // Ensure this is the correct byte representation of your next_game_id
           // You might need to fetch the globalState account to get the next_game_id
-          Buffer.from(next_game_id.toString())
+          new BN(globalStateAccount?.nextGameId).toArrayLike(Buffer, 'le', 2)
         ],
         program.programId
       );
       
+      const [playerPda, playerBump] = await PublicKey.findProgramAddress(
+        [
+          Buffer.from("player"),
+          // Ensure this is the correct byte representation of your next_game_id
+          // You might need to fetch the globalState account to get the next_game_id
+          anchorProvider?.wallet.publicKey.toBuffer()
+        ],
+        program.programId
+      );
+
+      const [bettingVaultPDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("betting_vault"), anchorProvider?.wallet.publicKey.toBuffer()],
+        program.programId
+    );
       
   
+      // const tx = await program?.methods.startSinglePlayerGame(
+      //   new BN(1e9), { // Assuming this is the bet amount
+      //   accounts: {
+      //     globalState: globalStatePda,
+      //     game: gamePda,
+      //     player: playerPda,
+      //     systemProgram: SystemProgram.programId
+      //   },
+      // })
+
       const tx = await program?.methods.startSinglePlayerGame(
-        new BN(1e6) // Assuming this is the bet amount
+        new BN(1e8)
       ).accounts({
-        globalState: globalStatePda,
-        game: gamePda,
-        player: anchorProvider.wallet.publicKey,
-        systemProgram: SystemProgram.programId,
-      }).rpc({commitment: "confirmed"})
+          globalState: globalStatePda,
+          game: gamePda,
+          player: playerPda,
+          bettingVault: bettingVaultPDA,
+        },
+      ).rpc()
+
+      // const latestBlockHash = await anchorProvider.connection.getLatestBlockhash("confirmed")
+      // tx.recentBlockhash = latestBlockHash.blockhash;
+      // tx.feePayer = anchorProvider?.wallet.publicKey;
+
+      // console.log(anchorProvider?.wallet.publicKey.toBase58())
+
+      // const signedTx = await anchorProvider.wallet.signTransaction(tx)
+      // await anchorProvider.sendAndConfirm(tx)
 
       setIsLoading(true)
 
-      console.log("Game started with transaction signature:", tx);
+      // console.log("Game started with transaction signature:", tx);
 
       // const globalStateAccount = await program?.account.globalState.fetch(globalStatePda);
       // const gameRoom = globalStateAccount?.next_game_id.toString();
@@ -294,7 +331,7 @@ const Home: NextPage<IProps> = ({
       setIsSinglePlayer(true)
       setIsGameActive(true)
   
-      router.push(`/room/${next_game_id}`)
+      router.push(`/room/${globalStateAccount?.nextGameId}`)
     } catch (error) {
       console.error("Failed to start single player game:", error);
     }

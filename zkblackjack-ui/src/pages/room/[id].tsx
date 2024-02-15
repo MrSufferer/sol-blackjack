@@ -2,10 +2,12 @@ import { ethers } from "ethers"
 import type { NextPage } from "next"
 import { useRouter } from "next/router"
 import { Game } from "../../components/Game"
+import { PublicKey } from "@solana/web3.js"
+import { AnchorProvider } from "@coral-xyz/anchor"
 
 interface IProps {
-  account: string
-  library: ethers.providers.Web3Provider
+  account: PublicKey
+  library: AnchorProvider
   setIsLoading: (val: boolean) => void
   isLoading: boolean
 }

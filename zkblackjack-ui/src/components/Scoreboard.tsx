@@ -1,10 +1,11 @@
 import React, { useEffect } from "react"
 import truncateEthAddress from "truncate-eth-address"
 import { Score } from "../context/SocketContext"
+import { PublicKey } from "@solana/web3.js"
 
 interface IProps {
-  playerOne: string
-  playerTwo: string
+  playerOne: PublicKey
+  playerTwo: PublicKey
   isSinglePlayer: boolean
   score: Score
   playerOneRound: string[]
@@ -31,7 +32,7 @@ export const Scoreboard: React.FC<IProps> = ({
         }border-opacity-20 mt-6 h-fit`}
       >
         <h1 className=" border-b-2 border-b-white pb-2 border-opacity-20">
-          {playerOne ? truncateEthAddress(playerOne) : "Player 1"}
+          {playerOne ? playerOne.toBase58() : "Player 1"}
         </h1>
         <div className="mt-2 flex flex-col h-full">
           {playerOneRound!
@@ -53,7 +54,7 @@ export const Scoreboard: React.FC<IProps> = ({
       {!isSinglePlayer && (
         <div className="col-start-2 col-span-1 mt-6 ">
           <h1 className="border-b-2 border-b-white pb-2 border-opacity-20">
-            {playerTwo ? truncateEthAddress(playerTwo) : "Player 2"}
+            {playerTwo ? playerTwo.toBase58() : "Player 2"}
           </h1>
           <div className="mt-2">
             {playerTwoRound!

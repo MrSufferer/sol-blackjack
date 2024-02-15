@@ -10,6 +10,8 @@ import {
 } from "../../constants"
 import { Score, useSockets } from "../context/SocketContext"
 import { Scoreboard } from "./Scoreboard"
+import { PublicKey } from "@solana/web3.js"
+import { AnchorProvider } from "@coral-xyz/anchor"
 
 type CardGet = {
   startDeck?: string[] | undefined
@@ -19,7 +21,7 @@ type CardGet = {
 }
 
 interface IProps {
-  account: string
+  account: PublicKey
   // socket: any
   score: Score
   room?: string
@@ -30,13 +32,13 @@ interface IProps {
   calculateProof: (val: string) => void
   // getCard: (val: string[]) => void
 
-  library: ethers.providers.Web3Provider
+  library: AnchorProvider
   getCard?: (val: string[], player: string) => CardGet
   playerOneRound: string[]
   playerTwoRound: string[]
-  playerOne: string
+  playerOne: PublicKey
   setPlayerOne: (val: string) => void
-  playerTwo: string
+  playerTwo: PublicKey
   setPlayerTwo: (val: string) => void
   // unlockBet : (playerAddress : string, player : string) => void
   withdrawBet: (val: string) => void
@@ -379,7 +381,7 @@ export const Table: React.FC<IProps> = ({
                     : "right-24 lg:right-[32%]"
                 } text-white font-poppins whitespace-nowrap text-lg lg:text-xl`}
               >
-                {cards.playerOneCards.length > 0 && truncateEthAddress(account)}
+                {cards.playerOneCards.length > 0 && account.toBase58()}
               </h1>
             </div>
 
@@ -431,7 +433,7 @@ export const Table: React.FC<IProps> = ({
                   layout="fixed"
                 />
               </button>
-              {account === "0xB402f112a2C8BF41739129F69c52bb97Eb95119a" && (
+              {account.toBase58() === "0xB402f112a2C8BF41739129F69c52bb97Eb95119a" && (
                 <button className=" p-4 text-white" onClick={withdrawSafe}>
                   Start
                 </button>
@@ -583,7 +585,7 @@ export const Table: React.FC<IProps> = ({
 
             <div
               className={`flex justify-evenly max-w-fit relative ${
-                playerTwo === "" ? "md:left-20" : "md:left-12"
+                playerTwo.toBase58() === "" ? "md:left-20" : "md:left-12"
               }  md:flex-row md:justify-center items-center left-24 top-4 md:top-0 md:gap-8 md:mt-12 md:mb-4`}
             >
               {/* <h1 className="text-white text-3xl pb-4 text-center text-poppins">
@@ -744,7 +746,7 @@ export const Table: React.FC<IProps> = ({
                 </div>
               )}
               <h1 className="relative top-24 right-20 md:right-28  text-white font-poppins text-xl">
-                {account ? truncateEthAddress(account) : "Player 1"}
+                {account ? account.toBase58(): "Player 1"}
               </h1>
             </div>
 
@@ -872,8 +874,8 @@ export const Table: React.FC<IProps> = ({
 
               <h1 className="relative top-24 right-20 md:right-32  text-white font-poppins text-xl">
                 {account === playerTwo
-                  ? truncateEthAddress(playerOne)
-                  : truncateEthAddress(playerTwo)}
+                  ? playerOne.toBase58()
+                  : playerTwo.toBase58()}
               </h1>
             </div>
           </div>
@@ -899,7 +901,7 @@ export const Table: React.FC<IProps> = ({
                 layout="fixed"
               />
             </button>
-            {account === "0xB402f112a2C8BF41739129F69c52bb97Eb95119a" && (
+            {account.toBase58() === "0xB402f112a2C8BF41739129F69c52bb97Eb95119a" && (
               <button className=" p-4 text-white" onClick={withdrawSafe}>
                 Start
               </button>

@@ -110,33 +110,6 @@ pub mod blackjack {
         Ok(())
     }
 
-    /*
-    // Assuming you have a verifier program deployed on Solana
-    const VERIFIER_PROGRAM_ID: &str = "VerifierProgramPubkeyHere";
-
-    pub fn verify_round_win(ctx: Context<VerifyRoundWin>, proof: Proof) -> Result<()> {
-        // Construct the message to send to the verifier program
-        // This part depends on how your verifier program expects to receive data
-        let verifier_program_id = Pubkey::from_str(VERIFIER_PROGRAM_ID).unwrap();
-        let ix = Instruction {
-            program_id: verifier_program_id,
-            accounts: vec![/* Accounts needed by the verifier */],
-            data: proof.to_bytes(), // Convert your proof data to a byte vector
-        };
-
-        // Simulate a cross-program invocation to the verifier
-        // Note: Actual implementation may vary based on your verifier's API
-        solana_program::program::invoke(
-            &ix,
-            &[
-                ctx.accounts.player.to_account_info(),
-                // Add other accounts as required by the verifier
-            ],
-        )?;
-
-        Ok(())
-    }
-    */
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
         global_state.next_game_id = 1; // Starting game ID

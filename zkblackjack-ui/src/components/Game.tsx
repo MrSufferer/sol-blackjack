@@ -29,7 +29,7 @@ import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana
 import { Program, Idl } from '@coral-xyz/anchor';
 import idl from '../../../target/idl/blackjack.json'; // Your IDL file path
 
-const PROGRAM_ID: string = "51P27qRbeM4UxhQzNeKiyok6FW5sxZvGkt2M9b9uFtK2";
+const PROGRAM_ID: string = "C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW";
 
 interface IProps {
   library: AnchorProvider
@@ -153,13 +153,7 @@ export const Game: React.FC<IProps> = ({
   
           
       const playerAccount = await program?.account.player?.fetch(playerPDA);
-      const gameId: number = playerAccount?.game_id
-  
-  
-      const [bettingVaultPDA] = await PublicKey.findProgramAddress(
-        [Buffer.from('betting_vault'), playerPublicKey.toBuffer()],
-        new PublicKey(PROGRAM_ID)
-      );
+      const gameId: number = playerAccount?.gameId
   
   
       // Derive the PDA for the game account
@@ -174,8 +168,7 @@ export const Game: React.FC<IProps> = ({
             program.methods.withdrawBet(0.2 * LAMPORTS_PER_SOL)
               .accounts({
                   game: gameAccountPda,
-                  player: playerPDA,
-                  betting_vault: bettingVaultPDA
+                  player: playerPDA
                   // Add other required accounts here
               }).rpc(),
 
@@ -337,7 +330,12 @@ export const Game: React.FC<IProps> = ({
 
           
       const playerAccount = await program?.account.player?.fetch(playerPDA);
-      const gameId: number = playerAccount?.game_id
+      const gameId: number = playerAccount?.gameId
+
+      const [gameAccountPda, gameAccountBump] = await PublicKey.findProgramAddress(
+        [Buffer.from('game'), new BN(gameId).toArrayLike(Buffer, 'le', 2)],
+        new PublicKey(PROGRAM_ID)
+      );
 
       if (!program) throw new Error("Program is not initialized");
 
@@ -357,39 +355,30 @@ export const Game: React.FC<IProps> = ({
           )
           setIsLoading(true)
 
-          const [bettingVaultPDA] = await PublicKey.findProgramAddress(
-            [Buffer.from('betting_vault'), playerPublicKey.toBuffer()],
-            new PublicKey(PROGRAM_ID)
-          );
-
-
         // Step 1: Transfer 0.1 SOL to the game account as winnings
         let transaction = new Transaction().add(
           SystemProgram.transfer({
             fromPubkey: anchorProvider?.wallet.publicKey, // it should be the house keypair. For now, just use the user's fund
-            toPubkey: bettingVaultPDA, // 
+            toPubkey: gameAccountPda, // 
             lamports: 0.1 * LAMPORTS_PER_SOL,
           })
         );
 
         // Sign and send the transaction
         let signature = await anchorProvider.sendAndConfirm(transaction);
-        console.log("Transfer confirmed with signature:", signature);
+        // console.log("Transfer confirmed with signature:", signature);
 
 
         // Derive the PDA for the game account
-        const [gameAccountPda, gameAccountBump] = await PublicKey.findProgramAddress(
-          [Buffer.from('game'), new BN(gameId).toArrayLike(Buffer, 'le', 2)],
-          new PublicKey(PROGRAM_ID)
-        );
+
 
         // Step 2: Call the endGame function from your program
-        await program.methods.endGame(gameId, 0.2 * LAMPORTS_PER_SOL)
-        .accounts({
-            game: gameAccountPda,
-            player: playerPDA,
-            // Add other required accounts here
-        }).rpc();
+        // await program.methods.endGame(new BN(gameId).toArrayLike(Buffer, 'le', 2), new BN(LAMPORTS_PER_SOL).mul(new BN(2).div(new BN(10))))
+        // .accounts({
+        //     game: gameAccountPda,
+        //     player: playerPDA,
+        //     // Add other required accounts here
+        // }).rpc();
 
           // setIsCanWithdraw(true)
           setIsCanWithdraw((prevState: Withdraw) => ({

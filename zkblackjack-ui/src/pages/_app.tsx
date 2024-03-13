@@ -6,11 +6,11 @@ import { Navbar } from "../components/Navbar"
 import io, { Socket } from "socket.io-client"
 // import { socket, SocketProvider } from "../../context/socket"
 import SocketsProvider from "../context/SocketContext"
-import { SolanaProvider, useAnchorProvider } from "../context/Solana"
+import { SolanaProvider } from "../context/Solana"
 import { AnchorProvider } from "@coral-xyz/anchor"
 
 const MyApp: AppType = ({ Component, pageProps }) => {
-  const anchorProvider = useAnchorProvider()
+  // const anchorProvider = useAnchorProvider()
   const [provider, setProvider] = useState()
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
@@ -21,15 +21,11 @@ const MyApp: AppType = ({ Component, pageProps }) => {
         <SolanaProvider>
           <div>
             <Navbar
-              library={anchorProvider!}
-              account={anchorProvider.publicKey}
               provider={provider}
               setProvider={setProvider}
             />
             <Component
               {...pageProps}
-              library={anchorProvider!}
-              account={anchorProvider.publicKey}
               isLoading={isLoading}
               setIsLoading={setIsLoading}
               // isSinglePlayer={isSinglePlayer}

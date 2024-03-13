@@ -2,7 +2,7 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-blackjack_sol = "8SRFsA98f7HikQZusHLEHEqvK26dQXb4XDWSzX2wL8vE"
+blackjack = "C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW"
 
 [registry]
 url = "https://api.apr.dev"

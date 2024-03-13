@@ -8,17 +8,13 @@ import { AnchorProvider } from "@coral-xyz/anchor"
 import { PublicKey } from "@solana/web3.js"
 
 interface IProps {
-  account: PublicKey
   setProvider: any
   provider: any
-  library: AnchorProvider
 }
 
 export const Navbar: React.FC<IProps> = ({
-  account,
   setProvider,
   provider,
-  library,
 }) => {
   const router = useRouter()
 

@@ -2,7 +2,7 @@
     "scripts": {
         "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
         "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
-        "test:psp": "light psp:test blackjack 8SRFsA98f7HikQZusHLEHEqvK26dQXb4XDWSzX2wL8vE",
+        "test:psp": "light psp:test blackjack C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW",
         "build:psp": "light psp:build blackjack"
     },
     "dependencies": {

@@ -12,7 +12,7 @@ pub mod verifying_key_blackjack;
 use light_psp4in4out_app_storage::Psp4In4OutAppStorageVerifierState;
 pub use verifying_key_blackjack::*;
 
-declare_id!("8SRFsA98f7HikQZusHLEHEqvK26dQXb4XDWSzX2wL8vE");
+declare_id!("C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW");
 
 #[program]
 pub mod blackjack {
@@ -111,27 +111,27 @@ pub mod blackjack {
     }
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        let global_state = &mut ctx.accounts.global_state;
-        global_state.next_game_id = 1; // Starting game ID
+        ctx.accounts.global_state.next_game_id = 1; // Starting game ID
         Ok(())
     }
 
     pub fn start_single_player_game(ctx: Context<StartGame>, bet_amount: u64) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
-        let game = &mut ctx.accounts.game;
         let player = &mut ctx.accounts.player;
 
         let cpi_context = CpiContext::new(
             ctx.accounts.system_program.to_account_info(),
             system_program::Transfer {
                 from: ctx.accounts.signer.to_account_info().clone(),
-                to: ctx.accounts.betting_vault.to_account_info().clone(),
+                to: ctx.accounts.game.to_account_info().clone(),
             },
         );
         system_program::transfer(cpi_context, bet_amount)?;
 
         // Increment the game ID for the next game
         global_state.next_game_id += 1;
+
+        let game = &mut ctx.accounts.game;
 
         game.game_id = global_state.next_game_id;
         player.game_id = global_state.next_game_id;
@@ -140,16 +140,12 @@ pub mod blackjack {
         game.player_one = *ctx.accounts.signer.key;
         game.bet_amount = bet_amount;
         game.is_game_active = true;
-        game.is_single_player = true;
-
-        emit!(GameCreated {
-            player1_address: *ctx.accounts.signer.key,
-            bet: bet_amount,
-        });
 
         Ok(())
     }
 
+
+    /*
     pub fn start_multiplayer_game(ctx: Context<StartGame>, bet_amount: u64) -> Result<()> {
         let global_state = &mut ctx.accounts.global_state;
         let game = &mut ctx.accounts.game;
@@ -202,16 +198,14 @@ pub mod blackjack {
         });
         Ok(())
     }
+    */
 
     pub fn end_game(ctx: Context<EndGame>, game_id: u16, final_bet: u64) -> Result<()> {
         let game = &mut ctx.accounts.game;
         // Placeholder for determining the winner logic
         let winner_address = game.player_one; // Simplified for example purposes
         let player = &mut ctx.accounts.player;
-        emit!(GameEnded {
-            winner_address,
-            total_prize: game.bet_amount * 2,
-        });
+
         game.is_game_active = false;
         player.bet = final_bet;
         Ok(())
@@ -230,7 +224,7 @@ pub mod blackjack {
         // Example for transferring SOL. For SPL tokens, you would use the Token program
         **ctx
             .accounts
-            .betting_vault
+            .game
             .to_account_info()
             .try_borrow_mut_lamports()? -= amount;
         **ctx
@@ -242,141 +236,9 @@ pub mod blackjack {
         // Reset player's bet or adjust accordingly
         ctx.accounts.player.bet -= amount;
 
-        emit!(GameEnded {
-            winner_address: ctx.accounts.player.key(),
-            total_prize: amount,
-        });
-
         Ok(())
     }
 
-}
-
-#[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(init, payer = user, space = 8 + 2, seeds = [b"global_state".as_ref()], bump)]
-    pub global_state: Account<'info, GlobalState>,
-    #[account(mut)]
-    pub user: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[account]
-pub struct GlobalState {
-    pub next_game_id: u16,
-}
-
-#[derive(Accounts)]
-pub struct CreateGame<'info> {
-    #[account(mut)]
-    pub global_state: Account<'info, GlobalState>, // Add this
-    #[account(init, payer = player_one, space = 8 + 8 + 8 + 1 + 32 + 32 + 8)]
-    pub game: Account<'info, Game>,
-    #[account(mut)]
-    pub player_one: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct JoinGame<'info> {
-    #[account(mut)]
-    pub game: Account<'info, Game>,
-    #[account(mut)]
-    pub player: Account<'info, Player>,
-    // Removed has_one = player_one as it's not correctly applicable here
-}
-
-#[derive(Accounts)]
-pub struct EndGame<'info> {
-    #[account(mut)]
-    pub game: Account<'info, Game>,
-    #[account(mut)]
-    pub player: Account<'info, Player>,
-}
-
-#[derive(Accounts)]
-pub struct WithdrawBet<'info> {
-    #[account(mut)]
-    pub game: Account<'info, Game>,
-    #[account(mut)]
-    pub player: Account<'info, Player>,
-    #[account(mut)]
-    pub betting_vault: Account<'info, BettingVault>,
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    // Include other necessary account references here
-}
-
-#[derive(Accounts)]
-pub struct StartGame<'info> {
-    #[account(mut)]
-    pub global_state: Account<'info, GlobalState>,
-    #[account(
-        init,
-        payer = signer,
-        space = 8 + 8 + 32 + 32 + 8 + 1 + 1 + 8,
-        seeds = [b"game", global_state.next_game_id.to_le_bytes().as_ref()],
-        bump
-    )]
-    pub game: Account<'info, Game>,
-    #[account(
-        init,
-        payer = signer,
-        space = 8 + 32 + 8, // Adjust space as needed for player account data
-        seeds = [b"player", signer.key().as_ref()],
-        bump,
-    )]
-    pub player: Account<'info, Player>,
-    #[account(
-        init,
-        payer = signer,
-        seeds = [b"betting_vault", signer.key().as_ref()],
-        bump,
-        space = 8 + 8 // Adjust the space as needed
-    )]
-    pub betting_vault: Account<'info, BettingVault>,
-    #[account(mut)]
-    pub signer: Signer<'info>,
-    pub system_program: Program<'info, System>,
-}
-
-#[account]
-pub struct Game {
-    pub game_id: u16,
-    pub player_one: Pubkey,
-    pub player_two: Option<Pubkey>,
-    pub bet_amount: u64,
-    pub is_game_active: bool,
-    pub is_single_player: bool,
-}
-
-#[account]
-pub struct Player {
-    pub bet: u64,
-    pub game_id: u16, // Include other player-related fields
-}
-
-#[account]
-pub struct BettingVault {
-    pub lamports: u64,
-}
-
-#[event]
-pub struct GameCreated {
-    pub player1_address: Pubkey,
-    pub bet: u64,
-}
-
-#[event]
-pub struct PlayerJoined {
-    pub player2_address: Pubkey,
-    pub game_id: u16,
-}
-
-#[event]
-pub struct GameEnded {
-    pub winner_address: Pubkey,
-    pub total_prize: u64,
 }
 
 #[error_code]

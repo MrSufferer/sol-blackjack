@@ -178,6 +178,78 @@ impl Swap {
 }
 */
 
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(init, payer = user, space = 8 + 2, seeds = [b"global_state".as_ref()], bump)]
+    pub global_state: Account<'info, GlobalState>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+pub struct GlobalState {
+    pub next_game_id: u16,
+}
+
+#[derive(Accounts)]
+pub struct EndGame<'info> {
+    #[account(mut)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player: Account<'info, Player>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawBet<'info> {
+    #[account(mut, seeds = [b"chestVault"], bump)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player: Account<'info, Player>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    // Include other necessary account references here
+}
+
+#[derive(Accounts)]
+pub struct StartGame<'info> {
+    #[account(mut)]
+    pub global_state: Account<'info, GlobalState>,
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + 2 + 32 + 8 + 1,
+        seeds = [b"game", global_state.next_game_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub game: Account<'info, Game>,
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + 8 + 2,
+        seeds = [b"player", signer.key().as_ref()],
+        bump,
+    )]
+    pub player: Account<'info, Player>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+pub struct Game {
+    pub game_id: u16,
+    pub player_one: Pubkey,
+    pub bet_amount: u64,
+    pub is_game_active: bool,
+}
+
+#[account]
+pub struct Player {
+    pub bet: u64,
+    pub game_id: u16,
+}
+
 #[derive(Debug)]
 #[account]
 pub struct InstructionDataLightInstructionThird {

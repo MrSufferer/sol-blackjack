@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.29.0",
+    "@metaplex-foundation/mpl-bubblegum": "^3.1.2",
+    "@metaplex-foundation/mpl-token-metadata": "^3.2.1",
+    "@solana/spl-account-compression": "^0.2.0",
     "@solana/wallet-adapter-base": "^0.9.23",
     "@solana/wallet-adapter-react": "^0.15.35",
     "@solana/wallet-adapter-react-ui": "^0.9.35",
@@ -17,6 +20,7 @@
     "@solana/web3.js": "^1.89.1",
     "@walletconnect/types": "^1.7.5",
     "@walletconnect/web3-provider": "^1.7.5",
+    "@zk-shuffle/jssdk": "^1.0.1",
     "ethers": "^5.7.1",
     "jotai": "^2.6.4",
     "next": "12.2.5",

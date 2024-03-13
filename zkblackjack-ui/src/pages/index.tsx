@@ -74,7 +74,7 @@ const Home: NextPage<IProps> = ({
 
 
   useEffect(() => {
-    const programID = new PublicKey('51P27qRbeM4UxhQzNeKiyok6FW5sxZvGkt2M9b9uFtK2');
+    const programID = new PublicKey('C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW');
     const solProgram = new Program(idl as Idl, programID, anchorProvider);
     setProgram(solProgram);
   }, []);
@@ -240,8 +240,7 @@ const Home: NextPage<IProps> = ({
   }
 
   const startSinglePlayer = async () => {
-    console.log(anchorProvider.wallet)
-    console.log(PublicKey.default)
+    console.log(anchorProvider.wallet.publicKey)
     console.log(program)
     if (!anchorProvider.wallet) {
       // Make sure the wallet is connected
@@ -284,11 +283,6 @@ const Home: NextPage<IProps> = ({
         ],
         program.programId
       );
-
-      const [bettingVaultPDA] = await PublicKey.findProgramAddress(
-        [Buffer.from("betting_vault"), anchorProvider?.wallet.publicKey.toBuffer()],
-        program.programId
-    );
       
   
       // const tx = await program?.methods.startSinglePlayerGame(
@@ -306,8 +300,7 @@ const Home: NextPage<IProps> = ({
       ).accounts({
           globalState: globalStatePda,
           game: gamePda,
-          player: playerPda,
-          bettingVault: bettingVaultPDA,
+          player: playerPda
         },
       ).rpc()
 

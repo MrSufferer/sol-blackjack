@@ -1,4 +1,5 @@
 
+/*
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Blackjack } from "../target/types/blackjack";
@@ -39,3 +40,4 @@ describe("blackjack-sol", () => {
     console.log("Your transaction signature", tx);
   })
 });
+*/

@@ -27,7 +27,7 @@ import { useAnchorProvider } from "../context/Solana"
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js"
 
 import { Program, Idl } from '@coral-xyz/anchor';
-import idl from '../../../target/idl/blackjack.json'; // Your IDL file path
+import idl from '../../idl/blackjack.json'; // Your IDL file path
 
 const PROGRAM_ID: string = "C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW";
 

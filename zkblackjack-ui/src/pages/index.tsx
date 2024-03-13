@@ -22,7 +22,7 @@ import { useSockets } from "../context/SocketContext"
 import web3, { SystemProgram, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import anchor, { BN } from "@coral-xyz/anchor";
 import { Program, Idl } from '@coral-xyz/anchor';
-import idl from '../../../target/idl/blackjack.json'; // Your IDL file path
+import idl from '../../idl/blackjack.json'; // Your IDL file path
 import { useAnchorProvider } from "../context/Solana"
 
 interface IProps {

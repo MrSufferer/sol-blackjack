@@ -24,6 +24,7 @@ import anchor, { BN } from "@coral-xyz/anchor";
 import { Program, Idl } from '@coral-xyz/anchor';
 import idl from '../../idl/blackjack.json'; // Your IDL file path
 import { useAnchorProvider } from "../context/Solana"
+import { useAnchorWallet } from "@solana/wallet-adapter-react";
 
 interface IProps {
   library: ethers.providers.Web3Provider
@@ -50,6 +51,7 @@ const Home: NextPage<IProps> = ({
 
   const [program, setProgram] = useState<Program | null>(null);
   const anchorProvider = useAnchorProvider();
+  const wallet = useAnchorWallet();
 
   const {
     socket,
@@ -242,7 +244,7 @@ const Home: NextPage<IProps> = ({
   const startSinglePlayer = async () => {
     console.log(anchorProvider.wallet.publicKey)
     console.log(program)
-    if (!anchorProvider.wallet) {
+    if (!anchorProvider.wallet.publicKey) {
       // Make sure the wallet is connected
       console.log("Wallet is not connected");
       toast("Wallet is not connected");
@@ -300,9 +302,16 @@ const Home: NextPage<IProps> = ({
       ).accounts({
           globalState: globalStatePda,
           game: gamePda,
-          player: playerPda
+          player: playerPda,
+          signer: anchorProvider.wallet.publicKey
         },
-      ).rpc()
+      ).transaction()
+
+      const latestBlockHash = await anchorProvider.connection.getLatestBlockhash("confirmed")
+      tx.recentBlockhash = latestBlockHash.blockhash;
+      tx.feePayer = anchorProvider?.wallet.publicKey;
+
+      await wallet?.signTransaction(tx)
 
       // const latestBlockHash = await anchorProvider.connection.getLatestBlockhash("confirmed")
       // tx.recentBlockhash = latestBlockHash.blockhash;

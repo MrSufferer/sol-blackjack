@@ -21,7 +21,7 @@ type CardGet = {
 }
 
 interface IProps {
-  account: PublicKey
+  account: PublicKey | null
   // socket: any
   score: Score
   room?: string
@@ -36,9 +36,9 @@ interface IProps {
   getCard?: (val: string[], player: string) => CardGet
   playerOneRound: string[]
   playerTwoRound: string[]
-  playerOne: PublicKey
+  playerOne?: PublicKey | null
   setPlayerOne: (val: string) => void
-  playerTwo: PublicKey
+  playerTwo?: PublicKey | null
   setPlayerTwo: (val: string) => void
   // unlockBet : (playerAddress : string, player : string) => void
   withdrawBet: (val: string) => void
@@ -102,18 +102,11 @@ export const Table: React.FC<IProps> = ({
   // }
 
   const getPlayers = async () => {
-    // const signer = library?.getSigner()
-
-    const blackjackContract = new Contract(
-      BLACKJACK_CONTRACT_ADDRESS,
-      BLACKJACK_CONTRACT_ABI,
-      library
-    )
-
-    const roomCheck = await blackjackContract.games(parseInt(room!))
-
-    setPlayerOne(roomCheck[2])
-    setPlayerTwo(roomCheck[3])
+    // TODO: Implement Solana-based player fetching
+    // For now, we'll set placeholder values
+    console.log("Getting players for room:", room)
+    // setPlayerOne(/* get from Solana program */)
+    // setPlayerTwo(/* get from Solana program */)
   }
 
   const hitMe = () => {
@@ -139,17 +132,9 @@ export const Table: React.FC<IProps> = ({
   }
 
   const withdrawSafe = async () => {
-    const signer = library?.getSigner()
-
-    const blackjackContract = new Contract(
-      BLACKJACK_CONTRACT_ADDRESS,
-      BLACKJACK_CONTRACT_ABI,
-      signer
-    )
-
-    const tx = await blackjackContract.withdrawSafe(
-      ethers.utils.parseEther("0.3")
-    )
+    // TODO: Implement Solana-based withdrawal
+    console.log("Withdrawing from Solana program...")
+    // Implementation will be added for Solana program withdrawal
   }
 
   // console.log("current deck", startDeck)
@@ -187,7 +172,7 @@ export const Table: React.FC<IProps> = ({
     if (!isSinglePlayer) {
       getPlayers()
     } else {
-      setPlayerOne(account)
+      setPlayerOne(account ? account.toBase58() : "")
     }
   }, [cards, isSinglePlayer])
 

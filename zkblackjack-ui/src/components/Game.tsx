@@ -5,7 +5,7 @@ import React, {
   useReducer,
   useContext,
 } from "react"
-import { BigNumber, Contract, ethers, providers, utils } from "ethers"
+// BN import moved to the anchor import below
 import {
   BLACKJACK_CONTRACT_ABI,
   BLACKJACK_CONTRACT_ADDRESS,

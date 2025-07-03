@@ -1,4 +1,4 @@
-import { ethers } from "ethers"
+// Removed ethers import - using Solana instead
 import type { NextPage } from "next"
 import { useRouter } from "next/router"
 import { Game } from "../../components/Game"

@@ -1,9 +1,9 @@
-import { Contract, ethers } from "ethers"
+// Removed ethers import - using Solana instead
 import Image from "next/image"
 import React, { useEffect } from "react"
 import { toast } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
-import truncateEthAddress from "truncate-eth-address"
+// Removed truncate-eth-address - using Solana addresses instead
 import {
   BLACKJACK_CONTRACT_ABI,
   BLACKJACK_CONTRACT_ADDRESS,

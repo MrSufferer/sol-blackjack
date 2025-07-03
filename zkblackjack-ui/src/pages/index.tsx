@@ -14,7 +14,7 @@ import {
 } from "../../constants"
 
 import { Game } from "../components/Game"
-import { BigNumber, Contract, ethers, providers, utils } from "ethers"
+// Removed ethers import - using Solana instead
 import Rules from "../components/Rules"
 import { Modal } from "../components/Modal"
 import { useSockets } from "../context/SocketContext"

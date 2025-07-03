@@ -1,5 +1,5 @@
 import React, { useEffect } from "react"
-import truncateEthAddress from "truncate-eth-address"
+// Removed truncate-eth-address - using Solana addresses instead
 import { Score } from "../context/SocketContext"
 import { PublicKey } from "@solana/web3.js"
 

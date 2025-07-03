@@ -48,10 +48,10 @@ interface TransactionResponse {
 // }
 
 type CardGet = {
-  tempDeck?: string[] | undefined
-  startDeck?: string[] | undefined
-  cardImage?: string | undefined
-  playerValue?: number | undefined
+  tempDeck: string[]
+  startDeck: string[]
+  cardImage?: string
+  playerValue: number
 }
 
 export const Game: React.FC<IProps> = ({
@@ -432,7 +432,15 @@ export const Game: React.FC<IProps> = ({
     return deck
   }
 
-  function getCard(deckData: string[], player: string): CardGet | any {
+  function getCard(deckData: string[], player: string): CardGet {
+    // Initialize default return object
+    const defaultReturn: CardGet = {
+      tempDeck: deckData,
+      startDeck: deckData,
+      cardImage: undefined,
+      playerValue: 0,
+    };
+
     if (isSinglePlayer) {
       if (sums.playerOneSum >= 21) {
         toast.error("You can't get more cards", {
@@ -444,10 +452,13 @@ export const Game: React.FC<IProps> = ({
           draggable: true,
           progress: undefined,
         })
+        return defaultReturn;
       } else {
-        const tempDeck = deckData
+        const tempDeck = [...deckData]; // Create a copy
         let playerValue = 0
         const playerCard = tempDeck.pop()
+        if (!playerCard) return defaultReturn;
+        
         const cardImage = `/cards/${playerCard}.svg`
         const value = getValue(playerCard!)
         playerValue += value!
@@ -467,6 +478,13 @@ export const Game: React.FC<IProps> = ({
           playerOneSum: prevState.playerOneSum + playerValue,
         }))
         setCurrentDeck(tempDeck)
+        
+        return {
+          tempDeck,
+          startDeck: tempDeck,
+          cardImage,
+          playerValue,
+        };
       }
     } else {
       if (player === "1") {
@@ -480,11 +498,18 @@ export const Game: React.FC<IProps> = ({
             draggable: true,
             progress: undefined,
           })
-          return { startDeck }
+          return {
+            tempDeck: deckData,
+            startDeck,
+            cardImage: undefined,
+            playerValue: 0,
+          };
         } else {
-          const tempDeck = deckData
+          const tempDeck = [...deckData]; // Create a copy
           let playerValue = 0
           const playerCard = tempDeck.pop()
+          if (!playerCard) return defaultReturn;
+          
           const cardImage = `/cards/${playerCard}.svg`
           const value = getValue(playerCard!)
           playerValue += value!
@@ -506,9 +531,10 @@ export const Game: React.FC<IProps> = ({
           setCurrentDeck(tempDeck)
           return {
             tempDeck,
+            startDeck: tempDeck,
             cardImage,
             playerValue,
-          }
+          };
         }
       } else {
         if (sums.playerTwoSum >= 21) {
@@ -522,12 +548,17 @@ export const Game: React.FC<IProps> = ({
             progress: undefined,
           })
           return {
+            tempDeck: deckData,
             startDeck,
-          }
+            cardImage: undefined,
+            playerValue: 0,
+          };
         } else {
-          const tempDeck = deckData
+          const tempDeck = [...deckData]; // Create a copy
           let playerValue = 0
           const playerCard = tempDeck.pop()
+          if (!playerCard) return defaultReturn;
+          
           const cardImage = `/cards/${playerCard}.svg`
           const value = getValue(playerCard!)
           playerValue += value!
@@ -549,9 +580,10 @@ export const Game: React.FC<IProps> = ({
           setCurrentDeck(tempDeck)
           return {
             tempDeck,
+            startDeck: tempDeck,
             cardImage,
             playerValue,
-          }
+          };
         }
       }
     }

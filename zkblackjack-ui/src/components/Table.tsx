@@ -14,10 +14,10 @@ import { PublicKey } from "@solana/web3.js"
 import { AnchorProvider } from "@coral-xyz/anchor"
 
 type CardGet = {
-  startDeck?: string[] | undefined
-  tempDeck?: string[] | undefined
-  cardImage?: string | undefined
-  playerValue?: number | undefined
+  tempDeck: string[]
+  startDeck: string[]
+  cardImage?: string
+  playerValue: number
 }
 
 interface IProps {

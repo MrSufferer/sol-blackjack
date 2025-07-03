@@ -18,6 +18,12 @@ const SolanaProvider = dynamic(
 const MyApp: AppType = ({ Component, pageProps }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false)
 
+  // Validate Component
+  if (!Component || typeof Component !== 'function') {
+    console.error('Invalid Component:', Component);
+    return <div>Error: Invalid page component</div>;
+  }
+
   return (
     <ErrorBoundary>
       <SafeComponent name="SocketsProvider">

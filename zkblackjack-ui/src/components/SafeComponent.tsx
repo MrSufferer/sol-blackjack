@@ -18,6 +18,15 @@ const SafeComponent: React.FC<SafeComponentProps> = ({
       return <>{fallback}</>;
     }
 
+    // Check if children is a plain object (not a React element)
+    if (typeof children === 'object' && 
+        children !== null && 
+        !React.isValidElement(children) &&
+        children.constructor === Object) {
+      console.error(`${name}: Received plain object as children:`, children);
+      return <>{fallback}</>;
+    }
+
     // Check if children is a valid React node
     if (typeof children === 'object' && 'type' in children && typeof children.type === 'undefined') {
       console.warn(`${name}: Invalid component type`);

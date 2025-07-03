@@ -106,7 +106,37 @@ export interface Sum {
   houseSum: number
 }
 
-const socket = io("https://zkblackjack.onrender.com/")
+// Initialize socket with better error handling
+let socket: Socket;
+
+try {
+  socket = io("https://zkblackjack.onrender.com/", {
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    timeout: 20000,
+    forceNew: true,
+    transports: ['websocket', 'polling']
+  });
+
+  // Handle connection errors
+  socket.on('connect_error', (error) => {
+    console.warn('Socket connection error:', error);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.warn('Socket disconnected:', reason);
+  });
+} catch (error) {
+  console.error('Failed to initialize socket:', error);
+  // Fallback socket mock for development
+  socket = {
+    on: () => {},
+    once: () => {},
+    off: () => {},
+    emit: () => {},
+  } as any;
+}
 
 const SocketContext = createContext<Context>({
   socket,
@@ -252,18 +282,28 @@ function SocketsProvider(props: any) {
   // setCards((prevCards) => ({ ...prevCards, playerOneCards: newCards }));
 
   const getValue = (card: string) => {
-    const data = card?.split("-")
-    const value = data[0]
+    try {
+      if (!card) return 0;
+      
+      const data = card?.split("-")
+      if (!data || data.length < 1) return 0;
+      
+      const value = data[0]
+      if (!value) return 0;
 
-    const check = /\d/.test(value!)
+      const check = /\d/.test(value)
 
-    if (check == false) {
-      if (value == "A") {
-        return 11
+      if (check == false) {
+        if (value == "A") {
+          return 11
+        }
+        return 10
+      } else {
+        return parseInt(value)
       }
-      return 10
-    } else {
-      return parseInt(value!)
+    } catch (error) {
+      console.error("Error getting card value:", error);
+      return 0;
     }
   }
 

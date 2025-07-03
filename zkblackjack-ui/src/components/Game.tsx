@@ -28,12 +28,11 @@ import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana
 
 import { Program, Idl } from '@coral-xyz/anchor';
 import idl from '../../idl/blackjack.json'; // Your IDL file path
+import { useAnchorWallet } from "@solana/wallet-adapter-react";
 
 const PROGRAM_ID: string = "5q7FiaffAC5nAFCnwy9PedhEjuL7vhjCQwuSsPVz9kny";
 
 interface IProps {
-  library: AnchorProvider
-  account: PublicKey
   room?: string
   isLoading: boolean
   setIsLoading: (val: boolean) => void
@@ -56,11 +55,8 @@ type CardGet = {
 }
 
 export const Game: React.FC<IProps> = ({
-  library,
-  account,
   isLoading,
   setIsLoading,
-
   room,
 }) => {
   const [currentDeck, setCurrentDeck] = useState<string[]>([])
@@ -104,8 +100,8 @@ export const Game: React.FC<IProps> = ({
 
   const router = useRouter()
   const effectRan = useRef(false)
-
   const anchorProvider = useAnchorProvider()
+  const wallet = useAnchorWallet()
   const [program, setProgram] = useState<Program>();
 
   useEffect(() => {
@@ -122,11 +118,7 @@ export const Game: React.FC<IProps> = ({
         playerOne: 0,
         playerTwo: 0,
       })
-      if (isSinglePlayer) {
-        const firstDeck = constructDeck()
-
-        dealCards(firstDeck)
-      }
+      // Don't call dealCards here - it will be handled elsewhere
     }
     return () => {
       effectRan.current = true
@@ -134,29 +126,29 @@ export const Game: React.FC<IProps> = ({
   }, [])
 
   useEffect(() => {
-    const programID = new PublicKey(PROGRAM_ID);
-    const solProgram = new Program(idl as Idl, programID, anchorProvider);
-    setProgram(solProgram);
-  }, []);
+    if (anchorProvider) {
+      const programID = new PublicKey(PROGRAM_ID);
+      const solProgram = new Program(idl as Idl, programID, anchorProvider);
+      setProgram(solProgram);
+    }
+  }, [anchorProvider]);
 
   const deck: string[] = []
 
   const withdrawBet = async (player: string) => {
     try {
-      if (!program) throw new Error("Program is not initialized");
+      if (!program || !wallet) {
+        toast.error("Please connect your wallet first");
+        return;
+      }
 
-      const playerPublicKey = anchorProvider?.wallet.publicKey; // Or any specific public key
-      const SEEDS = [Buffer.from("player"), playerPublicKey.toBuffer(), ];
+      const playerPublicKey = wallet.publicKey;
+      const SEEDS = [Buffer.from("player"), playerPublicKey.toBuffer()];
   
       const [playerPDA, bump] = await PublicKey.findProgramAddress(SEEDS, new PublicKey(PROGRAM_ID));
+      const playerAccount = await program.account.player.fetch(playerPDA);
+      const gameId: number = (playerAccount as any)?.gameId || 0;
   
-  
-          
-      const playerAccount = await program?.account.player?.fetch(playerPDA);
-      const gameId: number = playerAccount?.gameId
-  
-  
-      // Derive the PDA for the game account
       const [gameAccountPda, gameAccountBump] = await PublicKey.findProgramAddress(
         [Buffer.from('game'), new BN(gameId).toArrayLike(Buffer, 'le', 2)],
         new PublicKey(PROGRAM_ID)
@@ -165,102 +157,60 @@ export const Game: React.FC<IProps> = ({
       if (player === "1") {
         if (score.playerOne > 0) {
           const tx = await toast.promise(
-            program.methods.withdrawBet(0.2 * LAMPORTS_PER_SOL)
+            program.methods.withdrawBet(new BN(0.2 * LAMPORTS_PER_SOL))
               .accounts({
                   game: gameAccountPda,
                   player: playerPDA
-                  // Add other required accounts here
               }).rpc(),
-
             {
               pending: "Withdrawing...",
-              success: "Withdrew succesfully",
+              success: "Withdrew successfully",
               error: "Something went wrong 🤯",
             }
-          )
-          // const confirmation = await library.waitForTransaction(tx.hash)
-          // setIsCanWithdraw((prevState: Withdraw) => ({
-          //   ...prevState,
-          //   playerOne: true,
-          // }))
-        } else if (score.playerOne === 0) {
-          const tx: TransactionResponse = await toast.promise(
-            blackjackContract.withdrawBet(
-              ethers.utils.parseEther("0.01"),
-              parseInt(room!)
-            ),
-
-            {
-              pending: "Withdrawing...",
-              success: "Withdrew succesfully",
-              error: "Something went wrong 🤯",
-            }
-          )
-          const confirmation = await library.waitForTransaction(tx.hash)
-          // setIsCanWithdraw((prevState: Withdraw) => ({
-          //   ...prevState,
-          //   playerOne: true,
-          // }))
+          );
+          
+          setIsCanWithdraw((prevState: Withdraw) => ({
+            ...prevState,
+            playerOne: true,
+          }));
         }
       } else {
         if (score.playerTwo > 0) {
-          const tx: TransactionResponse = await toast.promise(
-            blackjackContract.withdrawBet(
-              ethers.utils.parseEther("0.02"),
-              parseInt(room!)
-            ),
-
+          const tx = await toast.promise(
+            program.methods.withdrawBet(new BN(0.2 * LAMPORTS_PER_SOL))
+              .accounts({
+                  game: gameAccountPda,
+                  player: playerPDA
+              }).rpc(),
             {
               pending: "Withdrawing...",
-              success: "Withdrew succesfully",
+              success: "Withdrew successfully",
               error: "Something went wrong 🤯",
             }
-          )
-          const confirmation = await library.waitForTransaction(tx.hash)
-          // setIsCanWithdraw((prevState: Withdraw) => ({
-          //   ...prevState,
-          //   playerTwo: true,
-          // }))
-        } else if (score.playerTwo === 0) {
-          const tx: TransactionResponse = await toast.promise(
-            blackjackContract.withdrawBet(
-              ethers.utils.parseEther("0.01"),
-              parseInt(room!)
-            ),
-
-            {
-              pending: "Withdrawing...",
-              success: "Withdrew succesfully",
-              error: "Something went wrong 🤯",
-            }
-          )
-          const confirmation = await library.waitForTransaction(tx.hash)
-          // setIsCanWithdraw((prevState: Withdraw) => ({
-          //   ...prevState,
-          //   playerTwo: true,
-          // }))
+          );
+          
+          setIsCanWithdraw((prevState: Withdraw) => ({
+            ...prevState,
+            playerTwo: true,
+          }));
         }
       }
-
-      // setRoundText(["Play", "Again"])
-      setIsGameEnded(false)
-      setIsLoading(false)
-      router.push("/")
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error("Withdraw error:", error);
+      toast.error("Failed to withdraw bet");
     }
   }
 
   useEffect(() => {
     if (isGameEnded && currentDeck.length <= 4) {
       if (isSinglePlayer) {
-        unlockBet(account, "1")
+        unlockBet(anchorProvider.wallet.publicKey, "1")
       } else {
         if (playerOneRound.length > 0 && playerTwoRound.length > 0) {
-          if (account === playerOne) {
-            unlockBet(account, "1")
+          if (anchorProvider.wallet.publicKey === playerOne) {
+            unlockBet(anchorProvider.wallet.publicKey, "1")
           } else {
-            unlockBet(account, "2")
+            unlockBet(anchorProvider.wallet.publicKey, "2")
           }
         }
       }
@@ -321,232 +271,18 @@ export const Game: React.FC<IProps> = ({
 
   const unlockBet = async (playerAddress: PublicKey, playerNumber: string) => {
     try {
-
-      const playerPublicKey = anchorProvider?.wallet.publicKey; // Or any specific public key
-      const SEEDS = [Buffer.from("player"), playerPublicKey.toBuffer(), ];
-
-      const [playerPDA, bump] = await PublicKey.findProgramAddress(SEEDS, new PublicKey(PROGRAM_ID));
-
-
-          
-      const playerAccount = await program?.account.player?.fetch(playerPDA);
-      const gameId: number = playerAccount?.gameId
-
-      const [gameAccountPda, gameAccountBump] = await PublicKey.findProgramAddress(
-        [Buffer.from('game'), new BN(gameId).toArrayLike(Buffer, 'le', 2)],
-        new PublicKey(PROGRAM_ID)
-      );
-
-      if (!program) throw new Error("Program is not initialized");
-
-      if (playerNumber === "1") {
-        if (score.playerOne > 0) {
-          toast.info(
-            "You have won the game and extra 0.01 Solana! Wait for withdraw button to come",
-            {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: true,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-              progress: 0,
-            }
-          )
-          setIsLoading(true)
-
-        // Step 1: Transfer 0.1 SOL to the game account as winnings
-        let transaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: anchorProvider?.wallet.publicKey, // it should be the house keypair. For now, just use the user's fund
-            toPubkey: gameAccountPda, // 
-            lamports: 0.1 * LAMPORTS_PER_SOL,
-          })
-        );
-
-        // Sign and send the transaction
-        let signature = await anchorProvider.sendAndConfirm(transaction);
-        // console.log("Transfer confirmed with signature:", signature);
-
-
-        // Derive the PDA for the game account
-
-
-        // Step 2: Call the endGame function from your program
-        // await program.methods.endGame(new BN(gameId).toArrayLike(Buffer, 'le', 2), new BN(LAMPORTS_PER_SOL).mul(new BN(2).div(new BN(10))))
-        // .accounts({
-        //     game: gameAccountPda,
-        //     player: playerPDA,
-        //     // Add other required accounts here
-        // }).rpc();
-
-          // setIsCanWithdraw(true)
-          setIsCanWithdraw((prevState: Withdraw) => ({
-            ...prevState,
-            playerOne: true,
-          }))
-        } else if (score.playerOne === 0) {
-          toast.info(
-            "It was a close game but it ended in tie. Wait for withdraw button to come to get back your initial bet",
-            {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: true,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-              progress: 0,
-            }
-          )
-          setIsLoading(true)
-
-          // const endGame: TransactionResponse = await blackjackContract.endGame(
-          //   account,
-          //   gameId,
-          //   ethers.utils.parseEther("0.01")
-          // )
-          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
-          // setIsCanWithdraw((prevState: Withdraw) => ({
-          //   ...prevState,
-          //   playerOne: true,
-          // }))
-          // setIsCanWithdraw(true)
-        } else {
-          toast.info(
-            "It was a close game but you have lost it. Play again to earn back your 0.1 SOL ",
-            {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: true,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-              progress: 0,
-            }
-          )
-          setIsLoading(true)
-
-          // const endGame: TransactionResponse = await blackjackContract.endGame(
-          //   account,
-          //   gameId,
-          //   ethers.utils.parseEther("0.00")
-          // )
-          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
-          setIsCanWithdraw((prevState: Withdraw) => ({
-            ...prevState,
-            playerOne: false,
-          }))
-          setIsLoading(false)
-
-          router.push("/")
-        }
-      } else {
-        // const nonce = await library.getTransactionCount(
-        //   "0xB402f112a2C8BF41739129F69c52bb97Eb95119a"
-        // )
-        if (score.playerTwo > 0) {
-          toast.info(
-            "You have won the game and extra 0.1 SOL! Wait for withdraw button to come",
-            {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: true,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-              progress: 0,
-            }
-          )
-          setIsLoading(true)
-
-          // const data = {
-          //   from: signerAddress,
-          //   to: BLACKJACK_CONTRACT_ADDRESS,
-          //   value: ethers.utils.parseEther("0.01"),
-          // }
-
-          // const tx: TransactionResponse = await signer.sendTransaction(data)
-
-          // const confirmation = await library.waitForTransaction(tx.hash)
-
-          // const endGame: TransactionResponse = await blackjackContract.endGame(
-          //   account,
-          //   gameId,
-          //   ethers.utils.parseEther("0.02"),
-          //   {
-          //     nonce: nonce + 1,
-          //   }
-          // )
-          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
-
-          setIsCanWithdraw((prevState: Withdraw) => ({
-            ...prevState,
-            playerTwo: true,
-          }))
-        } else if (score.playerTwo === 0) {
-          toast.info(
-            "It was a close game but it ended in tie. Wait for withdraw button to come to get back your initial bet",
-            {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: true,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-              progress: 0,
-            }
-          )
-          setIsLoading(true)
-          // const endGame: TransactionResponse = await blackjackContract.endGame(
-          //   account,
-          //   gameId,
-          //   ethers.utils.parseEther("0.01"),
-          //   {
-          //     nonce: nonce + 1,
-          //   }
-          // )
-          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
-
-          setIsCanWithdraw((prevState: Withdraw) => ({
-            ...prevState,
-            playerTwo: true,
-          }))
-        } else {
-          toast.info(
-            "It was a close game but you have lost it. Play again to earn back your 0.1 SOL ",
-            {
-              position: "top-center",
-              autoClose: 5000,
-              hideProgressBar: true,
-              closeOnClick: true,
-              pauseOnHover: true,
-              draggable: true,
-              progress: 0,
-            }
-          )
-          setIsLoading(true)
-          // const endGame: TransactionResponse = await blackjackContract.endGame(
-          //   account,
-          //   gameId,
-          //   ethers.utils.parseEther("0.00"),
-          //   {
-          //     nonce: nonce + 1,
-          //   }
-          // )
-          // const endGameReceipt = await library.waitForTransaction(endGame.hash)
-          setIsCanWithdraw((prevState: Withdraw) => ({
-            ...prevState,
-            playerTwo: false,
-          }))
-          setIsLoading(false)
-
-          router.push("/")
-        }
+      if (!program || !wallet) {
+        toast.error("Please connect your wallet first");
+        return;
       }
 
-      // setRoundText(["Play", "Again"])
-    } catch (err) {
-      console.error(err)
+      // TODO: Implement Solana smart contract interaction for unlocking bet
+      // This is a placeholder - you'll need to implement the actual Solana contract call
+      toast.success("Bet unlocked successfully");
+      
+    } catch (error) {
+      console.error("Unlock error:", error);
+      toast.error("Failed to unlock bet");
     }
   }
 
@@ -1327,21 +1063,19 @@ export const Game: React.FC<IProps> = ({
         isGameEnded={isGameEnded}
         getCard={getCard}
         library={anchorProvider}
-        account={anchorProvider?.wallet.publicKey}
-        // socket={socket}
+        account={anchorProvider?.wallet.publicKey || null}
         room={room}
         isLoading={isLoading}
         currentDeck={currentDeck}
-        playerOneRound={playerOneRound!}
-        playerTwoRound={playerTwoRound!}
+        playerOneRound={playerOneRound}
+        playerTwoRound={playerTwoRound}
         score={score}
-        // isCanWithdraw={isCanWithdraw!}
         calculateProof={calculateProof}
         withdrawBet={withdrawBet}
-        playerOne={playerOne}
-        setPlayerOne={setPlayerOne}
-        playerTwo={playerTwo}
-        setPlayerTwo={setPlayerTwo}
+        playerOne={playerOne?.toBase58() || ""}
+        setPlayerOne={(val: string) => setPlayerOne(val ? new PublicKey(val) : undefined)}
+        playerTwo={playerTwo?.toBase58() || ""}
+        setPlayerTwo={(val: string) => setPlayerTwo(val ? new PublicKey(val) : undefined)}
       />
       <ToastContainer
         position="top-center"

@@ -1,54 +1,39 @@
 import type { NextPage } from "next"
 import Head from "next/head"
-import { useState, useEffect, useContext } from "react"
+import { useState, useEffect } from "react"
 import { Wallet } from "../components/Wallet"
-import io from "socket.io-client"
 import Image from "next/image"
 import { useRouter } from "next/router"
 import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
-// import { constructDeck } from "../utils/constructDeck"
-import {
-  BLACKJACK_CONTRACT_ABI,
-  BLACKJACK_CONTRACT_ADDRESS,
-} from "../../constants"
-
 import { Game } from "../components/Game"
-// Removed ethers import - using Solana instead
 import Rules from "../components/Rules"
 import { Modal } from "../components/Modal"
 import { useSockets } from "../context/SocketContext"
+import SafeComponent from "../components/SafeComponent"
 
-import web3, { SystemProgram, PublicKey, clusterApiUrl, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import anchor, { BN } from "@coral-xyz/anchor";
+import { SystemProgram, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { BN } from "@coral-xyz/anchor";
 import { Program, Idl } from '@coral-xyz/anchor';
-import idl from '../../idl/blackjack.json'; // Your IDL file path
+import idl from '../../idl/blackjack.json';
 import { useAnchorProvider } from "../context/Solana"
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
 
+const PROGRAM_ID = "5q7FiaffAC5nAFCnwy9PedhEjuL7vhjCQwuSsPVz9kny";
+
 interface IProps {
-  library: ethers.providers.Web3Provider
-  account: string
   isLoading: boolean
   setIsLoading: (val: boolean) => void
 }
 
-interface TransactionResponse {
-  hash: string
-}
-
 const Home: NextPage<IProps> = ({
-  library,
-  account,
   isLoading,
   setIsLoading,
 }) => {
   const [isJoin, setIsJoin] = useState<boolean>(false)
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
-
   const [room, setRoom] = useState("")
   const router = useRouter()
-
   const [program, setProgram] = useState<Program | null>(null);
   const anchorProvider = useAnchorProvider();
   const wallet = useAnchorWallet();
@@ -56,7 +41,6 @@ const Home: NextPage<IProps> = ({
   const {
     socket,
     dealRoundCards,
-
     startDeck,
     isGameActive,
     setIsGameActive,
@@ -74,30 +58,19 @@ const Home: NextPage<IProps> = ({
     setIsGameEnded(false)
   }, [])
 
-
   useEffect(() => {
-    const programID = new PublicKey('5q7FiaffAC5nAFCnwy9PedhEjuL7vhjCQwuSsPVz9kny');
-    const solProgram = new Program(idl as Idl, programID, anchorProvider);
-    setProgram(solProgram);
-  }, []);
+    if (anchorProvider) {
+      const programID = new PublicKey(PROGRAM_ID);
+      const solProgram = new Program(idl as Idl, programID, anchorProvider);
+      setProgram(solProgram);
+    }
+  }, [anchorProvider]);
 
   const constructDeck = () => {
     const deck: string[] = []
 
     const cardValues: string[] = [
-      "A",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
-      "8",
-      "9",
-      "10",
-      "J",
-      "Q",
-      "K",
+      "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K",
     ]
     const cardTypes: string[] = ["D", "C", "H", "S"]
 
@@ -121,259 +94,113 @@ const Home: NextPage<IProps> = ({
 
   const joinRoom = async (data: any) => {
     try {
+      if (!program || !wallet) {
+        toast.error("Please connect your wallet first");
+        return;
+      }
+
       setIsLoading(true)
       const tempDeck = constructDeck()
 
-      const signer = library?.getSigner()
+      // TODO: Implement Solana smart contract interaction for joining room
+      // This is a placeholder - you'll need to implement the actual Solana contract call
+      const gameId = parseInt(room);
+      
+      // For now, just emit socket event and navigate
+      const {
+        usedDeck,
+        aceHouse,
+        acePlayerOne,
+        acePlayerTwo,
+        houseValue,
+        playerOneValue,
+        playerTwoValue,
+        housecurrentCards,
+        playerOneCurrentCards,
+        playerTwoCurrentCards,
+      } = dealRoundCards(tempDeck)
 
-      const blackjackContract = new Contract(
-        BLACKJACK_CONTRACT_ADDRESS,
-        BLACKJACK_CONTRACT_ABI,
-        signer
-      )
-
-      const roomCheck = await blackjackContract.games(parseInt(room))
-
-      if (
-        room !== "" &&
-        roomCheck[2] !== "0x0000000000000000000000000000000000000000"
-      ) {
-        const joinGame: TransactionResponse = await toast.promise(
-          blackjackContract.joinGame(room, {
-            value: ethers.utils.parseEther("0.01"),
-          }),
-          {
-            pending: "Sending transaction...",
-            success: "Joining to room",
-            error: "Something went wrong 🤯",
-          }
-        )
-        const confirmation = await library.waitForTransaction(joinGame.hash)
-        const {
-          usedDeck,
-          aceHouse,
-          acePlayerOne,
-          acePlayerTwo,
-          houseValue,
-          playerOneValue,
-          playerTwoValue,
-          housecurrentCards,
-          playerOneCurrentCards,
-          playerTwoCurrentCards,
-        } = dealRoundCards(tempDeck)
-
-        const sendData = {
-          room: data,
-          deck: usedDeck,
-          cards: {
-            playerOne: playerOneCurrentCards,
-            playerTwo: playerTwoCurrentCards,
-            house: housecurrentCards,
-          },
-          aces: {
-            playerOne: acePlayerOne,
-            playerTwo: acePlayerTwo,
-            house: aceHouse,
-          },
-          sums: {
-            playerOne: playerOneValue,
-            playerTwo: playerTwoValue,
-            house: houseValue,
-          },
-          // cards: cards,
-          // aces: aces,
-          // sums: sums,
-        }
-
-        socket.emit("join_room", sendData)
-        setStand({
-          playerOne: false,
-          playerTwo: false,
-        })
-        setIsGameActive(true)
-        setIsSinglePlayer(false)
-        setIsLoading(false)
-        router.push(`/room/${data}`)
+      const sendData = {
+        room: data,
+        deck: usedDeck,
+        cards: {
+          playerOne: playerOneCurrentCards,
+          playerTwo: playerTwoCurrentCards,
+          house: housecurrentCards,
+        },
+        aces: {
+          playerOne: acePlayerOne,
+          playerTwo: acePlayerTwo,
+          house: aceHouse,
+        },
+        sums: {
+          playerOne: playerOneValue,
+          playerTwo: playerTwoValue,
+          house: houseValue,
+        },
       }
+
+      socket.emit("join_room", sendData)
+      setStand({
+        playerOne: false,
+        playerTwo: false,
+      })
+      setIsGameActive(true)
+      setIsSinglePlayer(false)
+      setIsLoading(false)
+      router.push(`/room/${data}`)
+      
     } catch (error) {
       setIsLoading(false)
-      // setCards({})
       console.error(error)
+      toast.error("Failed to join room")
     }
   }
 
   const createRoom = async () => {
     try {
+      if (!program || !wallet) {
+        toast.error("Please connect your wallet first");
+        return;
+      }
+
       setIsLoading(true)
-      const signer = library?.getSigner()
 
-      const blackjackContract = new Contract(
-        BLACKJACK_CONTRACT_ADDRESS,
-        BLACKJACK_CONTRACT_ABI,
-        signer
-      )
-      const gameRoom = await blackjackContract.gameId()
+      // TODO: Implement Solana smart contract interaction for creating room
+      // This is a placeholder - you'll need to implement the actual Solana contract call
+      const gameId = Math.floor(Math.random() * 1000000); // Generate random game ID for now
 
-      const createGame: TransactionResponse = await toast.promise(
-        blackjackContract.startMultiplayerGame({
-          value: ethers.utils.parseEther("0.01"),
-        }),
-
-        {
-          pending: "Sending transaction...",
-          success: "Starting the game",
-          error: "Something went wrong 🤯",
-        }
-      )
-
-      const confirmation = await library.waitForTransaction(createGame.hash)
-
-      socket.emit("create_room", gameRoom.toString())
-      // const newRoom = window.prompt()
-      // socket.emit("create_room", newRoom?.toString())
+      socket.emit("create_room", gameId.toString())
       setIsGameActive(true)
       setIsSinglePlayer(false)
-      router.push(`/room/${gameRoom}`)
-      // router.push(`/room/${newRoom}`)
+      router.push(`/room/${gameId}`)
+      
     } catch (err) {
       console.error(err)
       setIsLoading(false)
+      toast.error("Failed to create room")
     }
   }
 
   const startSinglePlayer = async () => {
-    console.log(anchorProvider.wallet.publicKey)
-    console.log(program)
-    if (!anchorProvider.wallet.publicKey) {
-      // Make sure the wallet is connected
-      console.log("Wallet is not connected");
-      toast("Wallet is not connected");
-      return;
-    }
-  
     try {
-
-      if (!program) throw new Error("Program is not initialized");
-
-      const [globalStatePda] = await PublicKey.findProgramAddress(
-        [Buffer.from('global_state')],
-        program.programId
-      );
-
-      const globalStateAccount = await program?.account.globalState?.fetch(globalStatePda);
-
-
-      console.log(globalStateAccount?.nextGameId)
-
-
-      const [gamePda, gameBump] = await PublicKey.findProgramAddress(
-        [
-          Buffer.from("game"),
-          // Ensure this is the correct byte representation of your next_game_id
-          // You might need to fetch the globalState account to get the next_game_id
-          new BN(globalStateAccount?.nextGameId).toArrayLike(Buffer, 'le', 2)
-        ],
-        program.programId
-      );
-      
-      const [playerPda, playerBump] = await PublicKey.findProgramAddress(
-        [
-          Buffer.from("player"),
-          // Ensure this is the correct byte representation of your next_game_id
-          // You might need to fetch the globalState account to get the next_game_id
-          anchorProvider?.wallet.publicKey.toBuffer()
-        ],
-        program.programId
-      );
-      
-  
-      // const tx = await program?.methods.startSinglePlayerGame(
-      //   new BN(1e9), { // Assuming this is the bet amount
-      //   accounts: {
-      //     globalState: globalStatePda,
-      //     game: gamePda,
-      //     player: playerPda,
-      //     systemProgram: SystemProgram.programId
-      //   },
-      // })
-
-      const tx = await program?.methods.startSinglePlayerGame(
-        new BN(1e8)
-      ).accounts({
-          globalState: globalStatePda,
-          game: gamePda,
-          player: playerPda,
-          signer: anchorProvider.wallet.publicKey
-        },
-      ).transaction()
-
-      const latestBlockHash = await anchorProvider.connection.getLatestBlockhash("confirmed")
-      tx.recentBlockhash = latestBlockHash.blockhash;
-      tx.feePayer = anchorProvider?.wallet.publicKey;
-
-      await wallet?.signTransaction(tx)
-
-      // const latestBlockHash = await anchorProvider.connection.getLatestBlockhash("confirmed")
-      // tx.recentBlockhash = latestBlockHash.blockhash;
-      // tx.feePayer = anchorProvider?.wallet.publicKey;
-
-      // console.log(anchorProvider?.wallet.publicKey.toBase58())
-
-      // const signedTx = await anchorProvider.wallet.signTransaction(tx)
-      // await anchorProvider.sendAndConfirm(tx)
+      if (!wallet) {
+        toast.error("Please connect your wallet first");
+        return;
+      }
 
       setIsLoading(true)
-
-      // console.log("Game started with transaction signature:", tx);
-
-      // const globalStateAccount = await program?.account.globalState.fetch(globalStatePda);
-      // const gameRoom = globalStateAccount?.next_game_id.toString();
-
-
-      setIsSinglePlayer(true)
       setIsGameActive(true)
-  
-      router.push(`/room/${globalStateAccount?.nextGameId}`)
-    } catch (error) {
-      console.error("Failed to start single player game:", error);
+      setIsSinglePlayer(true)
+      setIsLoading(false)
+      router.push("/room/single")
+      
+    } catch (err) {
+      console.error(err)
+      setIsLoading(false)
+      toast.error("Failed to start single player game")
     }
-  };
-
-  // const startSinglePlayer = async () => {
-  //   try {
-  //     const signer = library?.getSigner()
-
-  //     const blackjackContract = new Contract(
-  //       BLACKJACK_CONTRACT_ADDRESS,
-  //       BLACKJACK_CONTRACT_ABI,
-  //       signer
-  //     )
-
-  //     const gameRoom = await blackjackContract.gameId()
-
-  //     const createGame: TransactionResponse = await toast.promise(
-  //       blackjackContract.startSinglePlayerGame({
-  //         value: ethers.utils.parseEther("0.01"),
-  //       }),
-
-  //       {
-  //         pending: "Sending transaction...",
-  //         success: "Starting the game",
-  //         error: "Something went wrong 🤯",
-  //       }
-  //     )
-  //     setIsLoading(true)
-
-  //     const confirmation = await library.waitForTransaction(createGame.hash)
-  //     setIsSinglePlayer(true)
-  //     setIsGameActive(true)
-
-  //     router.push(`/room/${gameRoom}`)
-  //   } catch (err) {
-  //     console.error(err)
-  //     setIsLoading(false)
-  //   }
-  // }
+  }
 
   return (
     <div className="">

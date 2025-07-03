@@ -109,33 +109,45 @@ export interface Sum {
 // Initialize socket with better error handling
 let socket: Socket;
 
+// Create a mock socket for when the real socket fails
+const createMockSocket = () => ({
+  on: () => {},
+  once: () => {},
+  off: () => {},
+  emit: () => {},
+  connect: () => {},
+  disconnect: () => {},
+  connected: false,
+  disconnected: true,
+  id: 'mock-socket',
+}) as any;
+
 try {
-  socket = io("https://zkblackjack.onrender.com/", {
-    reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
-    timeout: 20000,
-    forceNew: true,
-    transports: ['websocket', 'polling']
-  });
+  if (typeof window !== 'undefined') {
+    socket = io("https://zkblackjack.onrender.com/", {
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000,
+      timeout: 10000,
+      forceNew: true,
+      transports: ['websocket', 'polling']
+    });
 
-  // Handle connection errors
-  socket.on('connect_error', (error) => {
-    console.warn('Socket connection error:', error);
-  });
+    // Handle connection errors
+    socket.on('connect_error', (error) => {
+      console.warn('Socket connection error:', error);
+    });
 
-  socket.on('disconnect', (reason) => {
-    console.warn('Socket disconnected:', reason);
-  });
+    socket.on('disconnect', (reason) => {
+      console.warn('Socket disconnected:', reason);
+    });
+  } else {
+    // Server-side rendering fallback
+    socket = createMockSocket();
+  }
 } catch (error) {
   console.error('Failed to initialize socket:', error);
-  // Fallback socket mock for development
-  socket = {
-    on: () => {},
-    once: () => {},
-    off: () => {},
-    emit: () => {},
-  } as any;
+  socket = createMockSocket();
 }
 
 const SocketContext = createContext<Context>({

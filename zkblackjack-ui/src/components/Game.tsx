@@ -61,8 +61,14 @@ export const Game: React.FC<IProps> = ({
 }) => {
   // Early validation to prevent React error #130
   if (typeof isLoading !== 'boolean' || typeof setIsLoading !== 'function') {
-    console.error('Game component: Invalid props received');
+    console.error('Game component: Invalid props received', { isLoading, setIsLoading, room });
     return <div>Error: Invalid component props</div>;
+  }
+
+  // Additional room validation
+  if (!room || typeof room !== 'string') {
+    console.error('Game component: Invalid room prop', { room });
+    return <div>Error: Invalid room configuration</div>;
   }
   const [currentDeck, setCurrentDeck] = useState<string[]>([])
 
@@ -71,8 +77,27 @@ export const Game: React.FC<IProps> = ({
   //   playerTwo: [],
   // })
 
-  const [playerTwo, setPlayerTwo] = useState<PublicKey>()
-  const [playerOne, setPlayerOne] = useState<PublicKey>()
+  const [playerTwoKey, setPlayerTwoKey] = useState<string>("")
+  const [playerOneKey, setPlayerOneKey] = useState<string>("")
+  
+  // Convert string keys to PublicKey objects with error handling
+  const playerOne = (() => {
+    try {
+      return playerOneKey ? new PublicKey(playerOneKey) : undefined;
+    } catch (error) {
+      console.error("Invalid PublicKey for playerOne:", playerOneKey);
+      return undefined;
+    }
+  })();
+  
+  const playerTwo = (() => {
+    try {
+      return playerTwoKey ? new PublicKey(playerTwoKey) : undefined;
+    } catch (error) {
+      console.error("Invalid PublicKey for playerTwo:", playerTwoKey);
+      return undefined;
+    }
+  })();
 
   const {
     socket,
@@ -142,7 +167,7 @@ export const Game: React.FC<IProps> = ({
 
   const withdrawBet = async (player: string) => {
     try {
-      if (!program || !wallet) {
+      if (!program || !wallet || !wallet.publicKey) {
         toast.error("Please connect your wallet first");
         return;
       }
@@ -151,6 +176,13 @@ export const Game: React.FC<IProps> = ({
       const SEEDS = [Buffer.from("player"), playerPublicKey.toBuffer()];
   
       const [playerPDA, bump] = await PublicKey.findProgramAddress(SEEDS, new PublicKey(PROGRAM_ID));
+      
+      // Check if program.account.player exists
+      if (!program.account || !program.account.player) {
+        toast.error("Program account not available");
+        return;
+      }
+      
       const playerAccount = await program.account.player.fetch(playerPDA);
       const gameId: number = (playerAccount as any)?.gameId || 0;
   
@@ -161,6 +193,11 @@ export const Game: React.FC<IProps> = ({
 
       if (player === "1") {
         if (score.playerOne > 0) {
+          if (!program.methods.withdrawBet) {
+            toast.error("Withdraw method not available");
+            return;
+          }
+          
           const tx = await toast.promise(
             program.methods.withdrawBet(new BN(0.2 * LAMPORTS_PER_SOL))
               .accounts({
@@ -181,6 +218,11 @@ export const Game: React.FC<IProps> = ({
         }
       } else {
         if (score.playerTwo > 0) {
+          if (!program.methods.withdrawBet) {
+            toast.error("Withdraw method not available");
+            return;
+          }
+          
           const tx = await toast.promise(
             program.methods.withdrawBet(new BN(0.2 * LAMPORTS_PER_SOL))
               .accounts({
@@ -1077,10 +1119,22 @@ export const Game: React.FC<IProps> = ({
         score={score}
         calculateProof={calculateProof}
         withdrawBet={withdrawBet}
-        playerOne={playerOne?.toBase58() || ""}
-        setPlayerOne={(val: string) => setPlayerOne(val ? new PublicKey(val) : undefined)}
-        playerTwo={playerTwo?.toBase58() || ""}
-        setPlayerTwo={(val: string) => setPlayerTwo(val ? new PublicKey(val) : undefined)}
+        playerOne={playerOne || null}
+        setPlayerOne={(val: string) => {
+          try {
+            setPlayerOneKey(val);
+          } catch (error) {
+            console.error("Invalid PublicKey for playerOne:", val);
+          }
+        }}
+        playerTwo={playerTwo || null}
+        setPlayerTwo={(val: string) => {
+          try {
+            setPlayerTwoKey(val);
+          } catch (error) {
+            console.error("Invalid PublicKey for playerTwo:", val);
+          }
+        }}
       />
       <ToastContainer
         position="top-center"

@@ -29,6 +29,7 @@ function SolanaProviderInner({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => cluster?.endpoint || 'https://rpc.gorbagana.wtf/', [cluster]);
   const wallets = useMemo(
     () => [
+      new SolflareWalletAdapter(),
     ],
     [cluster]
   );

@@ -59,6 +59,11 @@ export const Game: React.FC<IProps> = ({
   setIsLoading,
   room,
 }) => {
+  // Early validation to prevent React error #130
+  if (typeof isLoading !== 'boolean' || typeof setIsLoading !== 'function') {
+    console.error('Game component: Invalid props received');
+    return <div>Error: Invalid component props</div>;
+  }
   const [currentDeck, setCurrentDeck] = useState<string[]>([])
 
   // const [roundText, setRoundText] = useState<RoundResult>({

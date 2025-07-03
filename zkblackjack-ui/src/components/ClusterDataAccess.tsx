@@ -35,15 +35,25 @@ export function toWalletAdapterNetwork(
 
 export const defaultClusters: Cluster[] = [
   {
+    name: 'gorbagana-testnet',
+    endpoint: 'https://rpc.gorbagana.wtf/',
+    network: ClusterNetwork.Testnet,
+  },
+  {
+    name: 'testnet',
+    endpoint: clusterApiUrl('testnet'),
+    network: ClusterNetwork.Testnet,
+  },
+  {
     name: 'devnet',
     endpoint: clusterApiUrl('devnet'),
     network: ClusterNetwork.Devnet,
   },
   { name: 'local', endpoint: 'http://localhost:8899' },
   {
-    name: 'testnet',
-    endpoint: clusterApiUrl('testnet'),
-    network: ClusterNetwork.Testnet,
+    name: 'mainnet-beta',
+    endpoint: clusterApiUrl('mainnet-beta'),
+    network: ClusterNetwork.Mainnet,
   },
 ];
 
@@ -105,8 +115,13 @@ export function ClusterProvider({ children }: { children: ReactNode }) {
       setClusters(clusters.filter((item) => item.name !== cluster.name));
     },
     setCluster: (cluster: Cluster) => setCluster(cluster),
-    getExplorerUrl: (path: string) =>
-      `https://explorer.solana.com/${path}${getClusterUrlParam(cluster)}`,
+    getExplorerUrl: (path: string) => {
+      // Use Gorbagana explorer for Gorbagana testnet
+      if (cluster.name === 'gorbagana-testnet') {
+        return `https://explorer.gorbagana.wtf/${path}`;
+      }
+      return `https://explorer.solana.com/${path}${getClusterUrlParam(cluster)}`;
+    },
   };
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

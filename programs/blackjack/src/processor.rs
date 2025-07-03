@@ -1,96 +1,129 @@
-use crate::verifying_key_blackjack::VERIFYINGKEY_BLACKJACK;
-use crate::LightInstructionThird;
 use anchor_lang::prelude::*;
-use light_macros::pubkey;
-use light_verifier_sdk::light_transaction::Proof;
-use light_verifier_sdk::light_transaction::VERIFIER_STATE_SEED;
-use light_verifier_sdk::{light_app_transaction::AppTransaction, light_transaction::Config};
 
-#[derive(Clone)]
-pub struct TransactionsConfig;
-impl Config for TransactionsConfig {
-    const ID: Pubkey = pubkey!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + 32 + 8, // discriminator + authority + next_game_id
+        seeds = [b"global_state"],
+        bump
+    )]
+    pub global_state: Account<'info, GlobalState>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
-pub fn cpi_verifier_two<'a, 'b, 'c, 'info, const NR_CHECKED_INPUTS: usize>(
-    ctx: &'a Context<'a, 'b, 'c, 'info, LightInstructionThird<'info, NR_CHECKED_INPUTS>>,
-    inputs: &'a Vec<u8>,
-) -> Result<()> {
-    let proof_verifier = Proof {
-        a: inputs[256..256 + 64].try_into().unwrap(),
-        b: inputs[256 + 64..256 + 192].try_into().unwrap(),
-        c: inputs[256 + 192..256 + 256].try_into().unwrap(),
-    };
-
-    let (_, bump) = anchor_lang::prelude::Pubkey::find_program_address(
-        &[
-            ctx.accounts.signing_address.key().to_bytes().as_ref(),
-            VERIFIER_STATE_SEED.as_ref(),
-        ],
-        ctx.program_id,
-    );
-
-    let bump = &[bump];
-    let seed = &ctx.accounts.signing_address.key().to_bytes();
-    let domain_separation_seed = VERIFIER_STATE_SEED;
-    let cpi_seed = &[seed, domain_separation_seed, &bump[..]];
-    let final_seed = &[&cpi_seed[..]];
-
-    let accounts: light_psp4in4out_app_storage::cpi::accounts::LightInstruction<'info> =
-        light_psp4in4out_app_storage::cpi::accounts::LightInstruction {
-            verifier_state: ctx.accounts.verifier_state.to_account_info(),
-            signing_address: ctx.accounts.signing_address.to_account_info(),
-            authority: ctx.accounts.authority.to_account_info(),
-            system_program: ctx.accounts.system_program.to_account_info(),
-            registered_verifier_pda: ctx.accounts.registered_verifier_pda.to_account_info(),
-            program_merkle_tree: ctx.accounts.program_merkle_tree.to_account_info(),
-            transaction_merkle_tree: ctx.accounts.transaction_merkle_tree.to_account_info(),
-            token_program: ctx.accounts.token_program.to_account_info(),
-            sender_spl: ctx.accounts.sender_spl.to_account_info(),
-            recipient_spl: ctx.accounts.recipient_spl.to_account_info(),
-            sender_sol: ctx.accounts.sender_sol.to_account_info(),
-            recipient_sol: ctx.accounts.recipient_sol.to_account_info(),
-            // relayer recipient and escrow will never be used in the same transaction
-            relayer_recipient_sol: ctx.accounts.relayer_recipient_sol.to_account_info(),
-            token_authority: ctx.accounts.token_authority.to_account_info(),
-            log_wrapper: ctx.accounts.log_wrapper.to_account_info(),
-            event_merkle_tree: ctx.accounts.event_merkle_tree.to_account_info(),
-        };
-
-    let mut cpi_ctx = CpiContext::new_with_signer(
-        ctx.accounts.verifier_program.to_account_info(),
-        accounts,
-        &final_seed[..],
-    );
-    cpi_ctx = cpi_ctx.with_remaining_accounts(ctx.remaining_accounts.to_vec());
-    let verifier_state = ctx.accounts.verifier_state.load()?;
-    light_psp4in4out_app_storage::cpi::shielded_transfer_inputs(
-        cpi_ctx,
-        proof_verifier.a,
-        proof_verifier.b,
-        proof_verifier.c,
-        <Vec<u8> as TryInto<[u8; 32]>>::try_into(verifier_state.checked_public_inputs[1].to_vec())
-            .unwrap(),
-        memoffset::offset_of!(crate::psp_accounts::VerifierState, verifier_state_data),
-    )
+#[derive(Accounts)]
+pub struct StartGame<'info> {
+    #[account(mut)]
+    pub global_state: Account<'info, GlobalState>,
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + 8 + 32 + 33 + 8 + 1 + 1, // discriminator + game_id + player_one + player_two (Option<Pubkey>) + bet_amount + is_game_active + is_single_player
+        seeds = [b"game", global_state.next_game_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub game: Account<'info, Game>,
+    #[account(
+        init,
+        payer = signer,
+        space = 8 + 8 + 8, // discriminator + game_id + bet
+        seeds = [b"player", signer.key().as_ref(), global_state.next_game_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub player: Account<'info, Player>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
-pub fn verify_program_proof<'a, 'b, 'c, 'info, const NR_CHECKED_INPUTS: usize>(
-    ctx: &'a Context<'a, 'b, 'c, 'info, LightInstructionThird<'info, NR_CHECKED_INPUTS>>,
-    inputs: &'a Vec<u8>,
-) -> Result<()> {
-    let proof_app = Proof {
-        a: inputs[0..64].try_into().unwrap(),
-        b: inputs[64..192].try_into().unwrap(),
-        c: inputs[192..256].try_into().unwrap(),
-    };
-    let verifier_state = ctx.accounts.verifier_state.load()?;
-    const NR_CHECKED_INPUTS: usize = VERIFYINGKEY_BLACKJACK.nr_pubinputs;
-    let mut app_verifier = AppTransaction::<NR_CHECKED_INPUTS, TransactionsConfig>::new(
-        &proof_app,
-        &verifier_state.checked_public_inputs,
-        &VERIFYINGKEY_BLACKJACK,
-    );
+#[derive(Accounts)]
+pub struct CreateGame<'info> {
+    #[account(mut)]
+    pub global_state: Account<'info, GlobalState>,
+    #[account(
+        init,
+        payer = player_one,
+        space = 8 + 8 + 32 + 33 + 8 + 1 + 1, // discriminator + game_id + player_one + player_two (Option<Pubkey>) + bet_amount + is_game_active + is_single_player
+        seeds = [b"game", global_state.next_game_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player_one: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
-    app_verifier.verify()
+#[derive(Accounts)]
+pub struct JoinGame<'info> {
+    #[account(mut)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player: Account<'info, Player>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct EndGame<'info> {
+    #[account(mut)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player: Account<'info, Player>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawBet<'info> {
+    #[account(mut)]
+    pub game: Account<'info, Game>,
+    #[account(mut)]
+    pub player: Account<'info, Player>,
+    #[account(mut)]
+    pub signer: Signer<'info>,
+}
+
+#[account]
+pub struct GlobalState {
+    pub authority: Pubkey,
+    pub next_game_id: u64,
+}
+
+#[account]
+pub struct Game {
+    pub game_id: u64,
+    pub player_one: Pubkey,
+    pub player_two: Option<Pubkey>,
+    pub bet_amount: u64,
+    pub is_game_active: bool,
+    pub is_single_player: bool,
+}
+
+#[account]
+pub struct Player {
+    pub game_id: u64,
+    pub bet: u64,
+}
+
+#[event]
+pub struct GameCreated {
+    pub player1_address: Pubkey,
+    pub bet: u64,
+}
+
+#[event]
+pub struct PlayerJoined {
+    pub player2_address: Pubkey,
+    pub game_id: u64,
+}
+
+#[event]
+pub struct GameEnded {
+    pub game_id: u64,
+    pub final_bet: u64,
 }

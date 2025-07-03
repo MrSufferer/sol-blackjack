@@ -25,7 +25,7 @@ export const WalletButton = WalletMultiButton;
 
 export function SolanaProvider({ children }: { children: ReactNode }) {
   const { cluster } = useCluster();
-  const endpoint = useMemo(() => clusterApiUrl("devnet"), [cluster]);
+  const endpoint = useMemo(() => cluster.endpoint, [cluster]);
   const wallets = useMemo(
     () => [
     ],

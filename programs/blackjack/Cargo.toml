@@ -14,18 +14,13 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
 [profile.release]
 lto = true
 
 [dependencies]
-anchor-lang = "0.28.0"
-anchor-spl = "0.28.0"
-light-merkle-tree-program = { version="0.3.1", features = ["cpi"] }
-light-psp4in4out-app-storage = { version="0.3.1", features = ["cpi"] }
-light-macros = { version="0.3.1" }
-light-verifier-sdk = { version="0.3.1" }
-solana-program = "1.16.4"
-groth16-solana = "0.0.2"
+anchor-lang = "0.30.0"
+anchor-spl = "0.30.0"
 bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"]}
 memoffset = "0.9.0"

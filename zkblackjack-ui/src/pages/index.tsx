@@ -76,7 +76,7 @@ const Home: NextPage<IProps> = ({
 
 
   useEffect(() => {
-    const programID = new PublicKey('C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW');
+    const programID = new PublicKey('5q7FiaffAC5nAFCnwy9PedhEjuL7vhjCQwuSsPVz9kny');
     const solProgram = new Program(idl as Idl, programID, anchorProvider);
     setProgram(solProgram);
   }, []);

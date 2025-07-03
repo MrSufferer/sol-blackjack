@@ -1,15 +1,19 @@
 [features]
 seeds = false
 skip-lint = false
+
 [programs.localnet]
 blackjack = "C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW"
+
+[programs.devnet]
+blackjack = "5q7FiaffAC5nAFCnwy9PedhEjuL7vhjCQwuSsPVz9kny"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
-wallet = "/Users/zeref/.config/solana/id.json"
+cluster = "https://rpc.gorbagana.wtf/"
+wallet = "/Users/kyler/.config/solana/id.json"
 
 [scripts]
 test = "pnpm ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

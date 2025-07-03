@@ -29,7 +29,7 @@ import { LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana
 import { Program, Idl } from '@coral-xyz/anchor';
 import idl from '../../idl/blackjack.json'; // Your IDL file path
 
-const PROGRAM_ID: string = "C48e3rcZc5urrHWk6kmDh4UcFkW3n5yGr8LzoRydeYKW";
+const PROGRAM_ID: string = "5q7FiaffAC5nAFCnwy9PedhEjuL7vhjCQwuSsPVz9kny";
 
 interface IProps {
   library: AnchorProvider

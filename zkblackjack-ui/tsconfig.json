@@ -23,7 +23,7 @@
     "**/*.tsx",
     "**/*.cjs",
     "**/*.mjs",
-    "constants/index.ts",
+    "constants/index.js",
     "src/context/socket.js"
   ],
   "exclude": ["node_modules"]

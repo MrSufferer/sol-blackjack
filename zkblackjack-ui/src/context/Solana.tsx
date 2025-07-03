@@ -16,6 +16,7 @@ import { ReactNode, useCallback, useMemo } from 'react';
 import {
   toWalletAdapterNetwork,
   useCluster,
+  ClusterProvider,
 } from '../components/ClusterDataAccess';
 import { clusterApiUrl, Connection } from '@solana/web3.js';
 
@@ -23,9 +24,9 @@ require('@solana/wallet-adapter-react-ui/styles.css');
 
 export const WalletButton = WalletMultiButton;
 
-export function SolanaProvider({ children }: { children: ReactNode }) {
+function SolanaProviderInner({ children }: { children: ReactNode }) {
   const { cluster } = useCluster();
-  const endpoint = useMemo(() => cluster.endpoint, [cluster]);
+  const endpoint = useMemo(() => cluster?.endpoint || 'https://rpc.gorbagana.wtf/', [cluster]);
   const wallets = useMemo(
     () => [
     ],
@@ -42,6 +43,16 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
+  );
+}
+
+export function SolanaProvider({ children }: { children: ReactNode }) {
+  return (
+    <ClusterProvider>
+      <SolanaProviderInner>
+        {children}
+      </SolanaProviderInner>
+    </ClusterProvider>
   );
 }
 

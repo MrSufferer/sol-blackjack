@@ -1,21 +1,14 @@
 import React from "react"
 import { Wallet } from "./Wallet"
-import { ethers } from "ethers"
 import Link from "next/link"
 import { useRouter } from "next/router"
 import { WalletButton } from "../context/Solana"
 import { AnchorProvider } from "@coral-xyz/anchor"
 import { PublicKey } from "@solana/web3.js"
 
-interface IProps {
-  setProvider: any
-  provider: any
-}
+interface IProps {}
 
-export const Navbar: React.FC<IProps> = ({
-  setProvider,
-  provider,
-}) => {
+export const Navbar: React.FC<IProps> = () => {
   const router = useRouter()
 
   //tooltip rules for game pages

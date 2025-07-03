@@ -17,7 +17,14 @@ export default defineNextConfig({
   swcMinify: true,
   webpack: function (config, options) {
     if (!options.isServer) {
-      config.resolve.fallback.fs = false
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        readline: false,
+        os: false,
+        path: false,
+        crypto: false,
+      }
     }
     config.experiments = { asyncWebAssembly: true, layers: true }
     return config

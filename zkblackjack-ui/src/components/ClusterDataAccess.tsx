@@ -78,7 +78,7 @@ const activeClustersAtom = atom<Cluster[]>((get) => {
 const activeClusterAtom = atom<Cluster>((get) => {
   const clusters = get(activeClustersAtom);
 
-  return clusters.find((item) => item.active) || clusters[0];
+  return clusters.find((item) => item.active) || clusters[0] || defaultClusters[0];
 });
 
 export interface ClusterProviderContext {

@@ -18,7 +18,12 @@ export default function Custom404() {
       <div className="text-center text-white">
         <h1 className="text-6xl font-bold mb-4">404</h1>
         <h2 className="text-2xl mb-4">Page Not Found</h2>
-        <p className="text-lg mb-8">The page you're looking for doesn't exist.</p>
+        <p className="mt-4 text-center text-lg">
+          The page you&apos;re looking for doesn&apos;t exist.
+        </p>
+        <p className="mt-2 text-center">
+          Let&apos;s get you back to the game!
+        </p>
         <button
           onClick={() => router.push('/')}
           className="bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold py-2 px-4 rounded"

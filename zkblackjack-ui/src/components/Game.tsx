@@ -30,7 +30,7 @@ import { Program, Idl } from '@coral-xyz/anchor';
 import idl from '../../idl/blackjack.json'; // Your IDL file path
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
 
-const PROGRAM_ID: string = "5q7FiaffAC5nAFCnwy9PedhEjuL7vhjCQwuSsPVz9kny";
+const PROGRAM_ID = "5q7FiaffAC5nAFCnwy9PedhEjuL7vhjCQwuSsPVz9kny";
 
 interface IProps {
   room?: string
@@ -59,46 +59,11 @@ export const Game: React.FC<IProps> = ({
   setIsLoading,
   room,
 }) => {
-  // Early validation to prevent React error #130
-  if (typeof isLoading !== 'boolean' || typeof setIsLoading !== 'function') {
-    console.error('Game component: Invalid props received', { isLoading, setIsLoading, room });
-    return <div>Error: Invalid component props</div>;
-  }
-
-  // Additional room validation
-  if (!room || typeof room !== 'string') {
-    console.error('Game component: Invalid room prop', { room });
-    return <div>Error: Invalid room configuration</div>;
-  }
+  // Move all hooks to the top before any conditional logic
   const [currentDeck, setCurrentDeck] = useState<string[]>([])
-
-  // const [roundText, setRoundText] = useState<RoundResult>({
-  //   playerOne: [],
-  //   playerTwo: [],
-  // })
-
   const [playerTwoKey, setPlayerTwoKey] = useState<string>("")
   const [playerOneKey, setPlayerOneKey] = useState<string>("")
   
-  // Convert string keys to PublicKey objects with error handling
-  const playerOne = (() => {
-    try {
-      return playerOneKey ? new PublicKey(playerOneKey) : undefined;
-    } catch (error) {
-      console.error("Invalid PublicKey for playerOne:", playerOneKey);
-      return undefined;
-    }
-  })();
-  
-  const playerTwo = (() => {
-    try {
-      return playerTwoKey ? new PublicKey(playerTwoKey) : undefined;
-    } catch (error) {
-      console.error("Invalid PublicKey for playerTwo:", playerTwoKey);
-      return undefined;
-    }
-  })();
-
   const {
     socket,
     isCanWithdraw,
@@ -132,7 +97,26 @@ export const Game: React.FC<IProps> = ({
   const effectRan = useRef(false)
   const anchorProvider = useAnchorProvider()
   const wallet = useAnchorWallet()
-  const [program, setProgram] = useState<Program>();
+  const [program, setProgram] = useState<Program>()
+
+  // Convert string keys to PublicKey objects with error handling
+  const playerOne = (() => {
+    try {
+      return playerOneKey ? new PublicKey(playerOneKey) : undefined;
+    } catch (error) {
+      console.error("Invalid PublicKey for playerOne:", playerOneKey);
+      return undefined;
+    }
+  })();
+  
+  const playerTwo = (() => {
+    try {
+      return playerTwoKey ? new PublicKey(playerTwoKey) : undefined;
+    } catch (error) {
+      console.error("Invalid PublicKey for playerTwo:", playerTwoKey);
+      return undefined;
+    }
+  })();
 
   useEffect(() => {
     if (effectRan.current === false) {
@@ -148,12 +132,11 @@ export const Game: React.FC<IProps> = ({
         playerOne: 0,
         playerTwo: 0,
       })
-      // Don't call dealCards here - it will be handled elsewhere
     }
     return () => {
       effectRan.current = true
     }
-  }, [])
+  }, [setIsLoading, setIsGameEnded, setIsCanWithdraw, setPlayerOneRound, setPlayerTwoRound, setScore])
 
   useEffect(() => {
     if (anchorProvider) {
@@ -162,6 +145,22 @@ export const Game: React.FC<IProps> = ({
       setProgram(solProgram);
     }
   }, [anchorProvider]);
+
+  useEffect(() => {
+    checkAce()
+  }, [sums])
+
+  // Early validation AFTER all hooks are called
+  if (typeof isLoading !== 'boolean' || typeof setIsLoading !== 'function') {
+    console.error('Game component: Invalid props received', { isLoading, setIsLoading, room });
+    return <div>Error: Invalid component props</div>;
+  }
+
+  // Additional room validation AFTER all hooks are called
+  if (!room || typeof room !== 'string') {
+    console.error('Game component: Invalid room prop', { room });
+    return <div>Error: Invalid room configuration</div>;
+  }
 
   const deck: string[] = []
 
@@ -588,10 +587,6 @@ export const Game: React.FC<IProps> = ({
       }
     }
   }
-
-  useEffect(() => {
-    checkAce()
-  }, [sums])
 
   const dealCards = (deckData: string[]) => {
     const usedDeck: string[] = deckData

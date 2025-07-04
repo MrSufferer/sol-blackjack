@@ -6,12 +6,6 @@ import React, {
   useContext,
 } from "react"
 // BN import moved to the anchor import below
-import {
-  BLACKJACK_CONTRACT_ABI,
-  BLACKJACK_CONTRACT_ADDRESS,
-  BLACKJACK_VERIFIER_CONTRACT_ABI,
-  BLACKJACK_VERIFIER_CONTRACT_ADDRESS,
-} from "../../constants/index"
 import Image from "next/image"
 import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
@@ -19,7 +13,6 @@ import { Modal } from "./Modal"
 import { Table } from "./Table"
 import { useRouter } from "next/router"
 import { useSockets, Withdraw } from "../context/SocketContext"
-import { blackjackCalldata } from "../../zkproof/snarkjsBlackjack"
 import { Ace, Card, Sum, Stand, Score } from "../context/SocketContext"
 
 import { AnchorProvider, BN } from "@coral-xyz/anchor"
@@ -164,6 +157,101 @@ export const Game: React.FC<IProps> = ({
 
   const deck: string[] = []
 
+  const unlockBet = async (playerAddress: PublicKey, playerNumber: string) => {
+    try {
+      if (!program || !wallet || !wallet.publicKey) {
+        toast.error("Please connect your wallet first");
+        return;
+      }
+
+      // Parse the room ID to get the game ID
+      const gameId = room === "single" ? 1 : parseInt(room || "1");
+      if (isNaN(gameId)) {
+        toast.error("Invalid game ID");
+        return;
+      }
+
+      // Get game PDA
+      const [gamePDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("game"), new BN(gameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Get player PDA
+      const [playerPDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("player"), wallet.publicKey.toBuffer(), new BN(gameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Calculate final bet amount based on game outcome
+      let finalBetAmount = new BN(0.1 * LAMPORTS_PER_SOL); // Default bet
+      
+      if (isSinglePlayer) {
+        // For single player, final bet depends on score
+        if (score.playerOne > 0) {
+          finalBetAmount = new BN(0.2 * LAMPORTS_PER_SOL); // Winner gets more
+        } else {
+          finalBetAmount = new BN(0.05 * LAMPORTS_PER_SOL); // House wins, player gets less
+        }
+      } else {
+        // For multiplayer, calculate based on scores
+        if (playerNumber === "1" && score.playerOne > score.playerTwo) {
+          finalBetAmount = new BN(0.2 * LAMPORTS_PER_SOL);
+        } else if (playerNumber === "2" && score.playerTwo > score.playerOne) {
+          finalBetAmount = new BN(0.2 * LAMPORTS_PER_SOL);
+        } else {
+          finalBetAmount = new BN(0.1 * LAMPORTS_PER_SOL); // Draw or lose
+        }
+      }
+
+      // Call the Solana program to end the game
+      if (!program.methods || !program.methods.endGame) {
+        toast.error("End game method not available");
+        return;
+      }
+
+      const tx = await toast.promise(
+        program.methods.endGame(gameId, finalBetAmount)
+          .accounts({
+            game: gamePDA,
+            player: playerPDA,
+            signer: wallet.publicKey,
+          }).rpc(),
+        {
+          pending: "Ending game...",
+          success: "Game ended successfully! You can now withdraw.",
+          error: "Failed to end game",
+        }
+      );
+
+      console.log("Game ended successfully:", tx);
+      
+      // Enable withdrawal
+      if (isSinglePlayer) {
+        setIsCanWithdraw((prevState: Withdraw) => ({
+          ...prevState,
+          playerOne: true,
+        }));
+      } else {
+        if (playerNumber === "1") {
+          setIsCanWithdraw((prevState: Withdraw) => ({
+            ...prevState,
+            playerOne: true,
+          }));
+        } else {
+          setIsCanWithdraw((prevState: Withdraw) => ({
+            ...prevState,
+            playerTwo: true,
+          }));
+        }
+      }
+      
+    } catch (error) {
+      console.error("Unlock bet error:", error);
+      toast.error("Failed to end game: " + (error as Error).message);
+    }
+  }
+
   const withdrawBet = async (player: string) => {
     try {
       if (!program || !wallet || !wallet.publicKey) {
@@ -171,79 +259,85 @@ export const Game: React.FC<IProps> = ({
         return;
       }
 
-      const playerPublicKey = wallet.publicKey;
-      const SEEDS = [Buffer.from("player"), playerPublicKey.toBuffer()];
-  
-      const [playerPDA, bump] = await PublicKey.findProgramAddress(SEEDS, new PublicKey(PROGRAM_ID));
-      
-      // Check if program.account.player exists
-      if (!program.account || !program.account.player) {
-        toast.error("Program account not available");
+      // Parse the room ID to get the game ID
+      const gameId = room === "single" ? 1 : parseInt(room || "1");
+      if (isNaN(gameId)) {
+        toast.error("Invalid game ID");
         return;
       }
-      
-      const playerAccount = await program.account.player.fetch(playerPDA);
-      const gameId: number = (playerAccount as any)?.gameId || 0;
-  
-      const [gameAccountPda, gameAccountBump] = await PublicKey.findProgramAddress(
-        [Buffer.from('game'), new BN(gameId).toArrayLike(Buffer, 'le', 2)],
+
+      // Get game PDA
+      const [gamePDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("game"), new BN(gameId).toArrayLike(Buffer, 'le', 8)],
         new PublicKey(PROGRAM_ID)
       );
 
+      // Get player PDA
+      const [playerPDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("player"), wallet.publicKey.toBuffer(), new BN(gameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Calculate withdrawal amount based on game outcome
+      let withdrawAmount = new BN(0);
+      
       if (player === "1") {
         if (score.playerOne > 0) {
-          if (!program.methods.withdrawBet) {
-            toast.error("Withdraw method not available");
-            return;
-          }
-          
-          const tx = await toast.promise(
-            program.methods.withdrawBet(new BN(0.2 * LAMPORTS_PER_SOL))
-              .accounts({
-                  game: gameAccountPda,
-                  player: playerPDA
-              }).rpc(),
-            {
-              pending: "Withdrawing...",
-              success: "Withdrew successfully",
-              error: "Something went wrong 🤯",
-            }
-          );
-          
-          setIsCanWithdraw((prevState: Withdraw) => ({
-            ...prevState,
-            playerOne: true,
-          }));
+          withdrawAmount = new BN(0.15 * LAMPORTS_PER_SOL); // Winner's share
+        } else {
+          withdrawAmount = new BN(0.05 * LAMPORTS_PER_SOL); // Consolation amount
         }
-      } else {
+      } else if (player === "2") {
         if (score.playerTwo > 0) {
-          if (!program.methods.withdrawBet) {
-            toast.error("Withdraw method not available");
-            return;
-          }
-          
-          const tx = await toast.promise(
-            program.methods.withdrawBet(new BN(0.2 * LAMPORTS_PER_SOL))
-              .accounts({
-                  game: gameAccountPda,
-                  player: playerPDA
-              }).rpc(),
-            {
-              pending: "Withdrawing...",
-              success: "Withdrew successfully",
-              error: "Something went wrong 🤯",
-            }
-          );
-          
-          setIsCanWithdraw((prevState: Withdraw) => ({
-            ...prevState,
-            playerTwo: true,
-          }));
+          withdrawAmount = new BN(0.15 * LAMPORTS_PER_SOL); // Winner's share
+        } else {
+          withdrawAmount = new BN(0.05 * LAMPORTS_PER_SOL); // Consolation amount
         }
       }
+
+      if (withdrawAmount.eq(new BN(0))) {
+        toast.error("No funds available to withdraw");
+        return;
+      }
+
+      // Call the Solana program to withdraw bet
+      if (!program.methods || !program.methods.withdrawBet) {
+        toast.error("Withdraw method not available");
+        return;
+      }
+      
+      const tx = await toast.promise(
+        program.methods.withdrawBet(withdrawAmount)
+          .accounts({
+            game: gamePDA,
+            player: playerPDA,
+            signer: wallet.publicKey,
+          }).rpc(),
+        {
+          pending: "Withdrawing funds...",
+          success: `Successfully withdrew ${withdrawAmount.toNumber() / LAMPORTS_PER_SOL} GOR!`,
+          error: "Withdrawal failed",
+        }
+      );
+
+      console.log("Withdrawal successful:", tx);
+
+      // Update withdrawal status
+      if (player === "1") {
+        setIsCanWithdraw((prevState: Withdraw) => ({
+          ...prevState,
+          playerOne: false, // Can't withdraw again
+        }));
+      } else {
+        setIsCanWithdraw((prevState: Withdraw) => ({
+          ...prevState,
+          playerTwo: false, // Can't withdraw again
+        }));
+      }
+      
     } catch (error) {
       console.error("Withdraw error:", error);
-      toast.error("Failed to withdraw bet");
+      toast.error("Failed to withdraw: " + (error as Error).message);
     }
   }
 
@@ -315,75 +409,49 @@ export const Game: React.FC<IProps> = ({
 
   
 
-  const unlockBet = async (playerAddress: PublicKey, playerNumber: string) => {
-    try {
-      if (!program || !wallet) {
-        toast.error("Please connect your wallet first");
-        return;
-      }
-
-      // TODO: Implement Solana smart contract interaction for unlocking bet
-      // This is a placeholder - you'll need to implement the actual Solana contract call
-      toast.success("Bet unlocked successfully");
-      
-    } catch (error) {
-      console.error("Unlock error:", error);
-      toast.error("Failed to unlock bet");
-    }
-  }
-
-
   const calculateProof = async (player: string) => {
-    let calldata: any
+    // Simplified game logic without zero-knowledge proofs
+    let playerSum = 0;
+    let houseSum = sums.houseSum;
+    let result = "0"; // 0 = lose, 1 = win
+    let draw = "0"; // 0 = no draw, 1 = draw, 2 = special case
+    
     if (isSinglePlayer) {
       setPlayerOneRound([...playerOneRound, "Calculating..."])
-      calldata = await blackjackCalldata(sums.playerOneSum, sums.houseSum)
+      playerSum = sums.playerOneSum;
     } else {
       if (player === "1") {
         setPlayerOneRound([...playerOneRound, "Calculating..."])
-
-        calldata = await blackjackCalldata(sums.playerOneSum, sums.houseSum)
+        playerSum = sums.playerOneSum;
       } else {
         setPlayerTwoRound([...playerTwoRound, "Calculating..."])
-
-        calldata = await blackjackCalldata(sums.playerTwoSum, sums.houseSum)
+        playerSum = sums.playerTwoSum;
       }
     }
 
+    // Simple blackjack logic without ZK proofs
+    if (playerSum > 21) {
+      result = "0"; // Player busts, loses
+      draw = "2"; // Special case for bust
+    } else if (houseSum > 21) {
+      result = "1"; // House busts, player wins
+    } else if (playerSum > houseSum) {
+      result = "1"; // Player wins with higher score
+    } else if (playerSum === houseSum) {
+      result = "0"; // Draw/tie, treated as no win
+      draw = "1"; // Draw
+    } else {
+      result = "0"; // House wins with higher score
+    }
+
     try {
-      // const signer = library?.getSigner()
-
-      // const blackjackContract = new Contract(
-      //   BLACKJACK_CONTRACT_ADDRESS,
-      //   BLACKJACK_CONTRACT_ABI,
-      //   signer
-      // )
-
-      // const result: TransactionResponse =
-      //   await blackjackContract.verifyRoundWin(
-      //     calldata.a,
-      //     calldata.b,
-      //     calldata.c,
-      //     calldata.Input
-      //   )
-      // if (result) {
-      //   getWinner(
-      //     player,
-      //     calldata.Input[0],
-      //     calldata.Input[1],
-      //     calldata.Input[2]
-      //   )
-      // } else {
-      //   return false
-      // }
-        getWinner(
-          player,
-          calldata.Input[0],
-          calldata.Input[1],
-          calldata.Input[2]
-        )
+      // Determine winner based on simple logic (no Solana program call needed here)
+      getWinner(player, result, draw, playerSum.toString());
+      
     } catch (error) {
-      console.error(error)
+      console.error("Calculate result error:", error);
+      // Fallback to local game logic
+      getWinner(player, result, draw, playerSum.toString());
     }
   }
 

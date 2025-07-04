@@ -7,7 +7,7 @@
         "test:integration": "node tests/blackjack-integration.js"
     },
     "dependencies": {
-        "@coral-xyz/anchor": "^0.28.0",
+        "@coral-xyz/anchor": "^0.31.1",
         "@solana/web3.js": "^1.89.1",
         "circomlibjs": "^0.1.7",
         "snarkjs": "^0.7.3"

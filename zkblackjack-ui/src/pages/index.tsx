@@ -99,14 +99,71 @@ const Home: NextPage<IProps> = ({
         return;
       }
 
-      setIsLoading(true)
-      const tempDeck = constructDeck()
+      setIsLoading(true);
 
-      // TODO: Implement Solana smart contract interaction for joining room
-      // This is a placeholder - you'll need to implement the actual Solana contract call
+      // Initialize program if needed
+      const globalStatePDA = await initializeProgramIfNeeded();
+
+      // Parse the game ID from the room input
       const gameId = parseInt(room);
+      if (isNaN(gameId) || gameId <= 0) {
+        throw new Error("Invalid room number");
+      }
+
+      // Define bet amount (0.1 SOL/GOR)
+      const betAmount = new BN(0.1 * LAMPORTS_PER_SOL);
+
+      // Get game PDA for the existing game
+      const [gamePDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("game"), new BN(gameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Get player PDA for the joining player
+      const [playerPDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("player"), wallet.publicKey.toBuffer(), new BN(gameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Check if the game exists and is joinable
+      try {
+        if (program.account && program.account.game) {
+          const gameAccount = await program.account.game.fetch(gamePDA);
+          if (!(gameAccount as any).isGameActive) {
+            throw new Error("Game is not active");
+          }
+          if ((gameAccount as any).isSinglePlayer) {
+            throw new Error("Cannot join a single player game");
+          }
+        }
+      } catch (error) {
+        throw new Error("Game not found or not joinable");
+      }
+
+      // Call the Solana program to join the multiplayer game
+      if (!program.methods || !program.methods.joinGame) {
+        throw new Error("Join game method not available");
+      }
       
-      // For now, just emit socket event and navigate
+      const tx = await program.methods
+        .joinGame(new BN(gameId), betAmount)
+        .accounts({
+          globalState: globalStatePDA,
+          game: gamePDA,
+          player: playerPDA,
+          signer: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      console.log("Successfully joined game!");
+      console.log("Transaction signature:", tx);
+
+      // Show success message
+      toast.success("Successfully joined the game!");
+
+      // Now do the socket communication for the UI
+      const tempDeck = constructDeck();
       const {
         usedDeck,
         aceHouse,
@@ -118,7 +175,7 @@ const Home: NextPage<IProps> = ({
         housecurrentCards,
         playerOneCurrentCards,
         playerTwoCurrentCards,
-      } = dealRoundCards(tempDeck)
+      } = dealRoundCards(tempDeck);
 
       const sendData = {
         room: data,
@@ -138,22 +195,142 @@ const Home: NextPage<IProps> = ({
           playerTwo: playerTwoValue,
           house: houseValue,
         },
-      }
+      };
 
-      socket.emit("join_room", sendData)
+      socket.emit("join_room", sendData);
       setStand({
         playerOne: false,
         playerTwo: false,
-      })
-      setIsGameActive(true)
-      setIsSinglePlayer(false)
-      setIsLoading(false)
-      router.push(`/room/${data}`)
+      });
+      setIsGameActive(true);
+      setIsSinglePlayer(false);
+      setIsLoading(false);
+      router.push(`/room/${data}`);
       
     } catch (error) {
-      setIsLoading(false)
-      console.error(error)
-      toast.error("Failed to join room")
+      setIsLoading(false);
+      console.error("Failed to join room:", error);
+      toast.error("Failed to join room: " + (error as Error).message);
+    }
+  }
+
+  const initializeProgramIfNeeded = async () => {
+    if (!program || !wallet) {
+      throw new Error("Program or wallet not available");
+    }
+
+    const [globalStatePDA] = await PublicKey.findProgramAddress(
+      [Buffer.from("global_state")],
+      new PublicKey(PROGRAM_ID)
+    );
+
+    try {
+      // Try to fetch the global state to see if it's initialized
+      if (program.account && program.account.globalState) {
+        await program.account.globalState.fetch(globalStatePDA);
+        console.log("Program already initialized");
+        return globalStatePDA;
+      }
+    } catch (error) {
+      // Global state doesn't exist, need to initialize
+      console.log("Program not initialized, initializing...");
+      
+      try {
+        if (!program.methods || !program.methods.initialize) {
+          throw new Error("Initialize method not available");
+        }
+
+        const tx = await program.methods
+          .initialize()
+          .accounts({
+            globalState: globalStatePDA,
+            signer: wallet.publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .rpc();
+
+        console.log("Program initialized successfully:", tx);
+        toast.success("Program initialized successfully!");
+        return globalStatePDA;
+      } catch (initError) {
+        console.error("Failed to initialize program:", initError);
+        throw new Error("Failed to initialize program: " + (initError as Error).message);
+      }
+    }
+
+    return globalStatePDA;
+  };
+
+  const startSinglePlayer = async () => {
+    try {
+      if (!wallet || !program) {
+        toast.error("Please connect your wallet first");
+        return;
+      }
+
+      setIsLoading(true);
+
+      // Initialize program if needed
+      const globalStatePDA = await initializeProgramIfNeeded();
+
+      // Define bet amount (0.1 SOL/GOR)
+      const betAmount = new BN(0.1 * LAMPORTS_PER_SOL);
+
+      // Get the next game ID from global state
+      let nextGameId = 1;
+      try {
+        if (program.account && program.account.globalState) {
+          const globalState = await program.account.globalState.fetch(globalStatePDA);
+          nextGameId = (globalState as any).nextGameId.toNumber();
+        }
+      } catch (error) {
+        console.log("Using default game ID 1");
+      }
+
+      // Get game PDA
+      const [gamePDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("game"), new BN(nextGameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Get player PDA
+      const [playerPDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("player"), wallet.publicKey.toBuffer(), new BN(nextGameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Call the Solana program to start single player game
+      if (!program.methods || !program.methods.startSinglePlayerGame) {
+        throw new Error("Program method not available");
+      }
+      
+      const tx = await program.methods
+        .startSinglePlayerGame(betAmount)
+        .accounts({
+          globalState: globalStatePDA,
+          game: gamePDA,
+          player: playerPDA,
+          signer: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      console.log("Single player game started successfully!");
+      console.log("Transaction signature:", tx);
+
+      // Show success message
+      toast.success("Single player game started successfully!");
+
+      // Set game state and navigate
+      setIsGameActive(true);
+      setIsSinglePlayer(true);
+      setIsLoading(false);
+      router.push("/room/single");
+      
+    } catch (err) {
+      console.error("Failed to start single player game:", err);
+      setIsLoading(false);
+      toast.error("Failed to start single player game: " + (err as Error).message);
     }
   }
 
@@ -164,41 +341,71 @@ const Home: NextPage<IProps> = ({
         return;
       }
 
-      setIsLoading(true)
+      setIsLoading(true);
 
-      // TODO: Implement Solana smart contract interaction for creating room
-      // This is a placeholder - you'll need to implement the actual Solana contract call
-      const gameId = Math.floor(Math.random() * 1000000); // Generate random game ID for now
+      // Initialize program if needed
+      const globalStatePDA = await initializeProgramIfNeeded();
 
-      socket.emit("create_room", gameId.toString())
-      setIsGameActive(true)
-      setIsSinglePlayer(false)
-      router.push(`/room/${gameId}`)
-      
-    } catch (err) {
-      console.error(err)
-      setIsLoading(false)
-      toast.error("Failed to create room")
-    }
-  }
+      // Define bet amount (0.1 SOL/GOR)
+      const betAmount = new BN(0.1 * LAMPORTS_PER_SOL);
 
-  const startSinglePlayer = async () => {
-    try {
-      if (!wallet) {
-        toast.error("Please connect your wallet first");
-        return;
+      // Get the next game ID from global state
+      let nextGameId = 1;
+      try {
+        if (program.account && program.account.globalState) {
+          const globalState = await program.account.globalState.fetch(globalStatePDA);
+          nextGameId = (globalState as any).nextGameId.toNumber();
+        }
+      } catch (error) {
+        console.log("Using default game ID 1");
       }
 
-      setIsLoading(true)
-      setIsGameActive(true)
-      setIsSinglePlayer(true)
-      setIsLoading(false)
-      router.push("/room/single")
+      // Get game PDA
+      const [gamePDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("game"), new BN(nextGameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Get player PDA
+      const [playerPDA] = await PublicKey.findProgramAddress(
+        [Buffer.from("player"), wallet.publicKey.toBuffer(), new BN(nextGameId).toArrayLike(Buffer, 'le', 8)],
+        new PublicKey(PROGRAM_ID)
+      );
+
+      // Call the Solana program to start multiplayer game
+      if (!program.methods || !program.methods.startMultiplayerGame) {
+        throw new Error("Program method not available");
+      }
+      
+      const tx = await program.methods
+        .startMultiplayerGame(betAmount)
+        .accounts({
+          globalState: globalStatePDA,
+          game: gamePDA,
+          player: playerPDA,
+          signer: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      console.log("Multiplayer game created successfully!");
+      console.log("Transaction signature:", tx);
+
+      // Show success message
+      toast.success("Multiplayer game created successfully!");
+
+      // Use the nextGameId as the room ID
+      const gameId = nextGameId;
+      socket.emit("create_room", gameId.toString());
+      setIsGameActive(true);
+      setIsSinglePlayer(false);
+      setIsLoading(false);
+      router.push(`/room/${gameId}`);
       
     } catch (err) {
-      console.error(err)
-      setIsLoading(false)
-      toast.error("Failed to start single player game")
+      console.error("Failed to create room:", err);
+      setIsLoading(false);
+      toast.error("Failed to create room: " + (err as Error).message);
     }
   }
 

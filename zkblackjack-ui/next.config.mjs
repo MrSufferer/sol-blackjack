@@ -1,57 +1,3 @@
-import { z } from 'zod'
-
-const server = z.object({
-  DATABASE_URL: z.string().url(),
-  OPEN_AI_API_KEY: z.string().min(1),
-})
-
-const client = z.object({
-  NEXT_PUBLIC_CLIENTVAR: z.string().min(1),
-})
-
-const processEnv = {
-  DATABASE_URL: process.env.DATABASE_URL,
-  OPEN_AI_API_KEY: process.env.OPEN_AI_API_KEY,
-  NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
-}
-
-const merged = server.merge(client)
-
-const isServer = typeof window === 'undefined'
-
-if (isServer) {
-  const parsed = merged.safeParse(processEnv)
-
-  if (parsed.success === false) {
-    console.error(
-      '❌ Invalid environment variables:',
-      parsed.error.flatten().fieldErrors
-    )
-    throw new Error('Invalid environment variables')
-  }
-}
-
-export const env = new Proxy(processEnv, {
-  get(target, prop) {
-    if (typeof prop !== 'string') return undefined
-    if (!isServer && !prop.startsWith('NEXT_PUBLIC_'))
-      throw new Error(
-        process.env.NODE_ENV === 'production'
-          ? '❌ Attempted to access a server-side environment variable on the client'
-          : `❌ Attempted to access server-side environment variable '${prop}' on the client`
-      )
-    return target[prop]
-  },
-})
-
-/**
- * Don't be scared of the generics here.
- * All they do is to give us autocompletion when using this.
- *
- * @template {import('next').NextConfig} T
- * @param {T} config - A generic parameter that flows through to the return type
- * @constraint {{import('next').NextConfig}}
- */
 function defineNextConfig(config) {
   return config
 }
@@ -92,17 +38,6 @@ export default defineNextConfig({
       layers: true 
     }
     
-    // Add runtime error catching for production
-    if (options.isServer === false) {
-      config.entry = async () => {
-        const entries = await config.entry()
-        if (entries['main.js'] && !entries['main.js'].includes('./zkblackjack-ui/error-handler.js')) {
-          entries['main.js'].push('./zkblackjack-ui/error-handler.js')
-        }
-        return entries
-      }
-    }
-    
     return config
   },
   
@@ -121,7 +56,7 @@ export default defineNextConfig({
   experimental: {
     // Enable runtime error overlay improvements
     appDir: false,
-    serverComponentsExternalPackages: ['@solana/web3.js'],
+    // Removed serverComponentsExternalPackages to eliminate warning
   },
   
   // Custom headers for better error tracking

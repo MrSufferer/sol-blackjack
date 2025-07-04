@@ -210,8 +210,15 @@ export const Game: React.FC<IProps> = ({
         return;
       }
 
+      console.log("🎯 Ending game with parameters:");
+      console.log("  Game ID (BN):", new BN(gameId).toString());
+      console.log("  Final Bet (BN):", finalBetAmount.toString());
+      console.log("  Game PDA:", gamePDA.toString());
+      console.log("  Player PDA:", playerPDA.toString());
+      console.log("  Signer:", wallet.publicKey.toString());
+
       const tx = await toast.promise(
-        program.methods.endGame(gameId, finalBetAmount)
+        program.methods.endGame(new BN(gameId), finalBetAmount)
           .accounts({
             game: gamePDA,
             player: playerPDA,
@@ -696,7 +703,7 @@ export const Game: React.FC<IProps> = ({
           break
         }
         const dealerCard = usedDeck.pop()
-        const cardImage = `/${dealerCard}.png`
+        const cardImage = `/cards/${dealerCard}.svg`
         housecurrentCards.push(cardImage)
 
         const value = getValue(dealerCard!)
@@ -942,13 +949,18 @@ export const Game: React.FC<IProps> = ({
           // });
         }
       }
+      // In single player mode, continue playing until explicitly ended
       if (currentDeck.length <= 4) {
-        setIsGameActive(false)
-        setIsGameEnded(true)
-
-        // unlockBet(account, "1")
+        toast.info("Final round! You can end the game or continue.", {
+          position: "top-center",
+          autoClose: 5000,
+        });
+        // Don't automatically end the game - let player decide
       } else {
-        dealCards(currentDeck)
+        // Deal next round automatically
+        setTimeout(() => {
+          dealCards(currentDeck);
+        }, 2000); // 2 second delay to see results
       }
     } else {
       if (player === "1") {

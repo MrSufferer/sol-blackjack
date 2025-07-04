@@ -103,6 +103,7 @@ export const Table: React.FC<IProps> = ({
     setScore,
     stand,
     isCanWithdraw,
+    setIsGameEnded,
   } = useSockets()
   // const handleClick = () => {
   //   dispatch({ type: LeaderboardActionKind.WIN_ROUND, payload: "Win" })
@@ -451,6 +452,17 @@ export const Table: React.FC<IProps> = ({
                   layout="fixed"
                 />
               </button>
+              {isSinglePlayer && (
+                <button 
+                  onClick={() => {
+                    setIsGameActive(false);
+                    setIsGameEnded(true);
+                  }}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition duration-300 ease-in-out"
+                >
+                  End Game
+                </button>
+              )}
             </div>
           )}
           {isCanWithdraw.playerOne! && (
@@ -919,6 +931,17 @@ export const Table: React.FC<IProps> = ({
                 layout="fixed"
               />
             </button>
+            {!isSinglePlayer && (
+              <button 
+                onClick={() => {
+                  setIsGameActive(false);
+                  setIsGameEnded(true);
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition duration-300 ease-in-out"
+              >
+                End Game
+              </button>
+            )}
           </div>
           {/* <ShareModal /> */}
         </div>

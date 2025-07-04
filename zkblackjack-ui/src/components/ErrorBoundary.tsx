@@ -49,7 +49,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           alignItems: 'center'
         }}>
           <h1>Something went wrong</h1>
-          <p>We're having trouble loading the game. Please try refreshing the page.</p>
+          <p>We&apos;re having trouble loading the game. Please try refreshing the page.</p>
           <button 
             onClick={() => window.location.reload()}
             style={{

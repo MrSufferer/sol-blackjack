@@ -131,6 +131,16 @@ export const Game: React.FC<IProps> = ({
     }
   }, [setIsLoading, setIsGameEnded, setIsCanWithdraw, setPlayerOneRound, setPlayerTwoRound, setScore])
 
+  // NEW: Initialize single player game with cards
+  useEffect(() => {
+    if (isSinglePlayer && isGameActive && cards.playerOneCards.length === 0) {
+      console.log("🎮 Initializing single player game with cards...");
+      const newDeck = constructDeck();
+      console.log("🎯 Constructed deck with", newDeck.length, "cards");
+      dealCards(newDeck);
+    }
+  }, [isSinglePlayer, isGameActive, cards.playerOneCards.length])
+
   useEffect(() => {
     if (anchorProvider) {
       const programID = new PublicKey(PROGRAM_ID);
@@ -664,8 +674,10 @@ export const Game: React.FC<IProps> = ({
   }
 
   const dealCards = (deckData: string[]) => {
+    console.log("🎲 dealCards called with deck length:", deckData.length);
     const usedDeck: string[] = deckData
     if (usedDeck.length >= 4) {
+      console.log("🎯 Dealing new round of cards...");
       // setRoundText([])
       setAces({
         playerOneAces: 0,

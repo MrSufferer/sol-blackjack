@@ -59,7 +59,7 @@ export const defaultClusters: Cluster[] = [
 
 const clusterAtom = atomWithStorage<Cluster>(
   'solana-cluster',
-  defaultClusters[0]
+  defaultClusters[0]!
 );
 const clustersAtom = atomWithStorage<Cluster[]>(
   'solana-clusters',
@@ -77,8 +77,7 @@ const activeClustersAtom = atom<Cluster[]>((get) => {
 
 const activeClusterAtom = atom<Cluster>((get) => {
   const clusters = get(activeClustersAtom);
-
-  return clusters.find((item) => item.active) || clusters[0] || defaultClusters[0];
+  return clusters.find((item) => item.active) || clusters[0] || defaultClusters[0]!;
 });
 
 export interface ClusterProviderContext {

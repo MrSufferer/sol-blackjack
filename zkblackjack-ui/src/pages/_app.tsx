@@ -5,15 +5,7 @@ import { Navbar } from "../components/Navbar"
 import SocketsProvider from "../context/SocketContext"
 import ErrorBoundary from "../components/ErrorBoundary"
 import SafeComponent from "../components/SafeComponent"
-import dynamic from "next/dynamic"
-
-const SolanaProvider = dynamic(
-  () => import("../context/Solana").then((mod) => ({ default: mod.SolanaProvider })),
-  {
-    ssr: false,
-    loading: () => <div style={{ padding: '20px', textAlign: 'center' }}>Loading wallet...</div>,
-  }
-)
+import { SolanaProvider } from "../context/Solana"
 
 const MyApp: AppType = ({ Component, pageProps }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false)

@@ -11,7 +11,10 @@ import {
   WalletModalProvider,
   WalletMultiButton,
 } from '@solana/wallet-adapter-react-ui';
-import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { 
+  SolflareWalletAdapter,
+  PhantomWalletAdapter,
+} from '@solana/wallet-adapter-wallets';
 import { ReactNode, useCallback, useMemo } from 'react';
 import {
   toWalletAdapterNetwork,
@@ -29,13 +32,14 @@ function SolanaProviderInner({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => cluster?.endpoint || 'https://rpc.gorbagana.wtf/', [cluster]);
   const wallets = useMemo(
     () => [
+      new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
     ],
     [cluster]
   );
 
   const onError = useCallback((error: WalletError) => {
-    console.error(error);
+    console.error('Wallet error:', error);
   }, []);
 
   return (
@@ -63,5 +67,6 @@ export function useAnchorProvider() {
 
   return new AnchorProvider(connection, wallet as AnchorWallet, {
     commitment: 'confirmed',
+    preflightCommitment: 'confirmed',
   });
 }
